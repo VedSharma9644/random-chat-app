@@ -1,33 +1,55 @@
-import express from 'express'
-import { createServer } from 'http'
-import { Server } from 'socket.io'
-import cors from 'cors'
-import * as admin from 'firebase-admin'
-import dotenv from 'dotenv'
+import express from 'express';
+import { createServer } from 'http';
+import { Server } from 'socket.io';
+import cors from 'cors';
+import * as admin from 'firebase-admin';
+import dotenv from 'dotenv';
+import path from 'path';
 
-dotenv.config()
+dotenv.config();
 
 // Initialize Firebase Admin from environment variable
-const serviceAccount = JSON.parse(process.env.SERVICE_ACCOUNT_KEY || '{}')
+const serviceAccount = JSON.parse(process.env.SERVICE_ACCOUNT_KEY || '{}');
 admin.initializeApp({
-  credential: admin.credential.cert(serviceAccount)
-})
+  credential: admin.credential.cert(serviceAccount),
+});
 
-const app = express()
-app.use(cors())
-app.use(express.json())
+const app = express();
 
-const httpServer = createServer(app)
+// Define allowed origin
+const allowedOrigin = process.env.CLIENT_URL || 'http://localhost:3000';
+
+
+// Configure CORS options
+const corsOptions = {
+  origin: allowedOrigin,
+  methods: ['GET', 'POST'],
+  credentials: true,
+};
+
+// Apply CORS middleware
+app.use(cors(corsOptions));
+
+// Handle preflight requests
+app.options('*', cors(corsOptions));
+
+app.use(express.json());
+
+// Serve static files from the 'frontend' directory
+app.use(express.static(path.join(__dirname, '../frontend')));
+
+const httpServer = createServer(app);
 const io = new Server(httpServer, {
   cors: {
-    origin: process.env.CLIENT_URL || 'http://localhost:3000',
-    methods: ['GET', 'POST']
-  }
-})
+    origin: allowedOrigin,
+    methods: ['GET', 'POST'],
+    credentials: true,
+  },
+});
 
 // Store waiting users and active rooms
-const waitingUsers: string[] = []
-const activeRooms: { [key: string]: string[] } = {}
+const waitingUsers: string[] = [];
+const activeRooms: { [key: string]: string[] } = {};
 
 // Store active rooms and their participants
 const rooms = new Map<string, Set<string>>();
@@ -48,40 +70,40 @@ function findPartner(socketId: string): { id: string } | null {
 
 // Socket.io connection handling
 io.on('connection', (socket) => {
-  console.log('User connected:', socket.id)
+  console.log('User connected:', socket.id);
 
   // Handle user authentication
   socket.on('authenticate', async (token: string) => {
     try {
-      const decodedToken = await admin.auth().verifyIdToken(token)
-      socket.data.userId = decodedToken.uid
-      console.log('User authenticated:', decodedToken.uid)
+      const decodedToken = await admin.auth().verifyIdToken(token);
+      socket.data.userId = decodedToken.uid;
+      console.log('User authenticated:', decodedToken.uid);
     } catch (error) {
-      console.error('Authentication error:', error)
-      socket.disconnect()
+      console.error('Authentication error:', error);
+      socket.disconnect();
     }
-  })
+  });
 
   // Handle user looking for a match
   socket.on('find_match', () => {
     if (waitingUsers.length > 0) {
       const partnerId = waitingUsers.pop()!;
       const roomId = `${socket.id}-${partnerId}`;
-      
+
       // Create room with both users
       rooms.set(roomId, new Set([socket.id, partnerId]));
-      
+
       // Join both users to the room
       socket.join(roomId);
       const partnerSocket = io.sockets.sockets.get(partnerId);
       partnerSocket?.join(roomId);
-      
+
       // Notify both users
       io.to(roomId).emit('match_found', roomId);
     } else {
       waitingUsers.push(socket.id);
     }
-  })
+  });
 
   // Handle WebRTC signaling
   socket.on('offer', (offer: RTCSessionDescriptionInit) => {
@@ -107,30 +129,30 @@ io.on('connection', (socket) => {
 
   // Handle messages
   socket.on('message', (message: string) => {
-    const roomId = Object.keys(activeRooms).find(room => 
+    const roomId = Object.keys(activeRooms).find((room) =>
       activeRooms[room].includes(socket.id)
-    )
-    
+    );
+
     if (roomId) {
       io.to(roomId).emit('message', {
         id: Date.now().toString(),
         text: message,
         sender: socket.id,
-        timestamp: new Date()
-      })
+        timestamp: new Date(),
+      });
     }
-  })
+  });
 
   // Handle disconnection
   socket.on('disconnect', () => {
     console.log('User disconnected:', socket.id);
-    
+
     // Remove from waiting list
     const waitingIndex = waitingUsers.indexOf(socket.id);
     if (waitingIndex !== -1) {
       waitingUsers.splice(waitingIndex, 1);
     }
-    
+
     // Clean up rooms
     for (const [roomId, participants] of rooms.entries()) {
       if (participants.has(socket.id)) {
@@ -144,19 +166,14 @@ io.on('connection', (socket) => {
         }
       }
     }
-  })
-})
+  });
+});
 
-const PORT = process.env.PORT || 3001
+const PORT = process.env.PORT || 3001;
 httpServer.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`)
-})
-
+  console.log(`Server running on port ${PORT}`);
+});
 
 app.get('/', (req, res) => {
   res.send('Welcome to the Chat App!');
 });
-import path from 'path';
-
-// Serve static files from the 'frontend' directory
-app.use(express.static(path.join(__dirname, '../frontend')));
