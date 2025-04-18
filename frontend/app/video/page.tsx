@@ -6,12 +6,12 @@ import { getSocket, initializeSocket } from '@/utils/socket'
 import { auth } from '@/utils/auth'
 import { useRouter } from 'next/navigation'
 
-interface Message {
-  id: string
-  text: string
-  sender: string
-  timestamp: Date
-}
+// interface Message {
+//   id: string
+//   text: string
+//   sender: string
+//   timestamp: Date
+// }
 
 export default function VideoChatPage() {
   const router = useRouter()
