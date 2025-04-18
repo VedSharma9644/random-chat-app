@@ -145,45 +145,18 @@ export default function ChatRoom() {
         <div 
           className="absolute inset-0 z-0"
           style={{
-            backgroundImage: `url("data:image/svg+xml,%3Csvg width='100' height='100' viewBox='0 0 100 100' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M11 18c3.866 0 7-3.134 7-7s-3.134-7-7-7-7 3.134-7 7 3.134 7 7 7zm48 25c3.866 0 7-3.134 7-7s-3.134-7-7-7-7 3.134-7 7 3.134 7 7 7zm-43-7c1.657 0 3-1.343 3-3s-1.343-3-3-3-3 1.343-3 3 1.343 3 3 3zm63 31c1.657 0 3-1.343 3-3s-1.343-3-3-3-3 1.343-3 3 1.343 3 3 3zM34 90c1.657 0 3-1.343 3-3s-1.343-3-3-3-3 1.343-3 3 1.343 3 3 3zm56-76c1.657 0 3-1.343 3-3s-1.343-3-3-3-3 1.343-3 3 1.343 3 3 3zM12 86c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm28-65c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm23-11c2.76 0 5-2.24 5-5s-2.24-5-5-5-5 2.24-5 5 2.24 5 5 5zm-6 60c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm29 22c2.76 0 5-2.24 5-5s-2.24-5-5-5-5 2.24-5 5 2.24 5 5 5zM32 63c2.76 0 5-2.24 5-5s-2.24-5-5-5-5 2.24-5 5 2.24 5 5 5zm57-13c2.76 0 5-2.24 5-5s-2.24-5-5-5-5 2.24-5 5 2.24 5 5 5zm-9-21c1.105 0 2-.895 2-2s-.895-2-2-2-2 .895-2 2 .895 2 2 2zM60 91c1.105 0 2-.895 2-2s-.895-2-2-2-2 .895-2 2 .895 2 2 2zM35 41c1.105 0 2-.895 2-2s-.895-2-2-2-2 .895-2 2 .895 2 2 2zM12 60c1.105 0 2-.895 2-2s-.895-2-2-2-2 .895-2 2 .895 2 2 2z' fill='%23000000' fill-opacity='0.1' fill-rule='evenodd'/%3E%3C/svg%3E")`,
-            backgroundSize: '300px 300px',
-            opacity: 0.1
+            backgroundImage: `url("data:image/svg+xml,%3Csvg width='100' height='100' viewBox='0 0 100 100' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M11 18c3.866 0 7-3.134 7-7s-3.134-7-7-7-7 3.134-7 7 3.134 7 7 7zm48 25c3.866 0 7-3.134 7-7s-3.134-7-7-7-7 3.134-7 7 3.134 7 7 7zm-43-7c1.657 0 3-1.343 3-3s-1.343-3-3-3-3 1.343-3 3 1.343 3 3 3zm63 31c1.657 0 3-1.343 3-3s-1.343-3-3-3-3 1.343-3 3 1.343 3 3 3zM34 90c1.657 0 3-1.343 3-3s-1.343-3-3-3-3 1.343-3 3 1.343 3 3 3zm56-76c1.657 0 3-1.343 3-3s-1.343-3-3-3-3 1.343-3 3 1.343 3 3 3zM12 86c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm28-65c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm23-11c2.76 0 5-2.24 5-5s-2.24-5-5-5-5 2.24-5 5 2.24 5 5 5zm-6 60c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm29 22c2.76 0 5-2.24 5-5s-2.24-5-5-5-5 2.24-5 5 2.24 5 5 5z' fill='%23c3d7d2'/%3E%3C/svg%3E")`,
+            backgroundSize: 'cover',
+            backgroundPosition: 'center'
           }}
-        />
-
-        <div className="relative z-10 min-h-full p-4">
-          <div className="max-w-3xl mx-auto space-y-4">
-            {messages.map((message, index) => (
-              <div
-                key={message.id}
-                className={`flex ${
-                  message.sender === 'me' 
-                    ? 'justify-end' 
-                    : message.sender === 'system' 
-                      ? 'justify-center' 
-                      : 'justify-start'
-                } ${index === 0 ? 'mt-4' : ''}`}
-              >
-                {message.sender === 'system' ? (
-                  <div className="bg-[#fff] text-gray-600 text-sm py-2 px-4 rounded-lg shadow-sm max-w-[90%] text-center">
-                    {message.text}
-                  </div>
-                ) : (
-                  <div className={`max-w-[75%] ${message.sender === 'me' ? 'ml-12' : 'mr-12'}`}>
-                    <div
-                      className={`relative px-3 py-2 shadow-sm ${
-                        message.sender === 'me'
-                          ? 'bg-[#dcf8c6] message-right'
-                          : 'bg-white message-left'
-                      }`}
-                    >
-                      <p className="text-gray-800 break-words">{message.text}</p>
-                      <span className="text-[11px] text-gray-500 ml-2 float-right mt-1">
-                        {formatTime(message.timestamp)}
-                      </span>
-                    </div>
-                  </div>
-                )}
+        ></div>
+        <div className="overflow-y-scroll max-h-full p-4 pt-12">
+          <div className="space-y-4">
+            {messages.map(message => (
+              <div key={message.id} className={`message ${message.sender === 'me' ? 'text-right' : ''}`}>
+                <div className="font-semibold text-sm">{message.sender}</div>
+                <div>{message.text}</div>
+                <div className="text-xs text-gray-500">{formatTime(message.timestamp)}</div>
               </div>
             ))}
             <div ref={messagesEndRef} />
@@ -191,77 +164,31 @@ export default function ChatRoom() {
         </div>
       </div>
 
-      <div className="bg-[#f0f0f0] border-t border-gray-200">
-        {!isConnected && !isSearching && (
-          <div className="p-4 flex justify-center">
-            <button
-              onClick={startSearching}
-              className="bg-[#075e54] text-white px-6 py-3 rounded-full hover:bg-[#0c766b] transition-colors shadow-lg hover:shadow-xl transform hover:-translate-y-0.5 active:translate-y-0 flex items-center space-x-2"
-            >
-              <span>Start Random Chat</span>
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 8l4 4m0 0l-4 4m4-4H3" />
-              </svg>
-            </button>
-          </div>
-        )}
-
-        {isSearching && (
-          <div className="p-4 flex justify-center items-center space-x-3">
-            <div className="animate-spin rounded-full h-5 w-5 border-2 border-[#075e54] border-t-transparent"></div>
-            <span className="text-[#075e54] font-medium">Finding your chat partner...</span>
-          </div>
-        )}
-
-        {isConnected && (
-          <div className="p-3">
-            <div className="max-w-3xl mx-auto flex items-center space-x-2">
-              <div className="flex-1 bg-white rounded-full shadow-sm flex items-center">
-                <input
-                  type="text"
-                  value={inputMessage}
-                  onChange={handleInputChange}
-                  onKeyPress={(e) => e.key === 'Enter' && sendMessage()}
-                  placeholder="Type a message..."
-                  className="flex-1 px-4 py-2 bg-transparent focus:outline-none min-w-0 rounded-full"
-                />
-                <button className="p-2 hover:bg-gray-100 rounded-full mx-1">
-                  <svg className="w-6 h-6 text-[#075e54]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14.828 14.828a4 4 0 01-5.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                  </svg>
-                </button>
-              </div>
-              <button
-                onClick={sendMessage}
-                disabled={!inputMessage.trim()}
-                className="bg-[#075e54] text-white p-3 rounded-full hover:bg-[#0c766b] transition-colors shadow-md disabled:opacity-50 disabled:cursor-not-allowed flex-shrink-0"
-              >
-                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 12h14M12 5l7 7-7 7" />
-                </svg>
-              </button>
-            </div>
-          </div>
-        )}
-      </div>
-
-      <style jsx>{`
-        .message-right {
-          border-radius: 15px 15px 3px 15px;
-        }
-        .message-left {
-          border-radius: 15px 15px 15px 3px;
-        }
-
-        .overflow-y-auto::-webkit-scrollbar {
-          display: none;
-        }
-
-        .overflow-y-auto {
-          -ms-overflow-style: none;
-          scrollbar-width: none;
-        }
-      `}</style>
+      {!isConnected && !isSearching && (
+        <div className="bg-[#075e54] p-4">
+          <button
+            onClick={startSearching}
+            className="text-white w-full py-2 bg-[#0a7441] rounded-full"
+          >
+            Start Chat
+          </button>
+        </div>
+      )}
+      
+      {isConnected && (
+        <div className="bg-[#075e54] p-4">
+          <input
+            type="text"
+            value={inputMessage}
+            onChange={handleInputChange}
+            placeholder="Type a message"
+            className="w-full p-2 rounded-full text-black"
+          />
+          <button onClick={sendMessage} className="text-white px-4 py-2 rounded-full mt-2 bg-[#128c7e]">
+            Send
+          </button>
+        </div>
+      )}
     </div>
   )
 }

@@ -3,11 +3,11 @@
 import { useState, useEffect, useRef } from 'react'
 
 interface VoiceChatProps {
-  roomId: string
-  isConnected: boolean
+  roomId: string;
+  isConnected: boolean;
 }
 
-export default function VoiceChat({ roomId, isConnected }: VoiceChatProps) {
+export default function VoiceChat({ isConnected }: VoiceChatProps) {
   const [isMuted, setIsMuted] = useState(true)
   const [isSpeaking, setIsSpeaking] = useState(false)
   const localStreamRef = useRef<MediaStream | null>(null)
