@@ -3,10 +3,11 @@
 import { useState, useEffect, useRef } from 'react'
 
 interface VoiceChatProps {
+  roomId: string
   isConnected: boolean
 }
 
-export default function VoiceChat({ isConnected }: VoiceChatProps) {
+export default function VoiceChat({ roomId, isConnected }: VoiceChatProps) {
   const [isMuted, setIsMuted] = useState(true)
   const [isSpeaking, setIsSpeaking] = useState(false)
   const localStreamRef = useRef<MediaStream | null>(null)
@@ -26,20 +27,17 @@ export default function VoiceChat({ isConnected }: VoiceChatProps) {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
       localStreamRef.current = stream
-      
-      // Create audio context and analyser for voice activity detection
+
       const audioContext = new AudioContext()
       audioContextRef.current = audioContext
-      
+
       const analyser = audioContext.createAnalyser()
       analyserRef.current = analyser
-      
+
       const source = audioContext.createMediaStreamSource(stream)
       source.connect(analyser)
-      
-      // Start voice activity detection
+
       checkVoiceActivity()
-      
       setIsMuted(false)
     } catch (error) {
       console.error('Error accessing microphone:', error)
@@ -64,14 +62,14 @@ export default function VoiceChat({ isConnected }: VoiceChatProps) {
 
     const analyser = analyserRef.current
     const dataArray = new Uint8Array(analyser.frequencyBinCount)
-    
+
     const check = () => {
       analyser.getByteFrequencyData(dataArray)
       const average = dataArray.reduce((a, b) => a + b) / dataArray.length
-      setIsSpeaking(average > 20) // Adjust threshold as needed
+      setIsSpeaking(average > 20)
       requestAnimationFrame(check)
     }
-    
+
     check()
   }
 
@@ -124,4 +122,4 @@ export default function VoiceChat({ isConnected }: VoiceChatProps) {
       )}
     </div>
   )
-} 
+}

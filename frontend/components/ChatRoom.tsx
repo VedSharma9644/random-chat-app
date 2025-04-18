@@ -27,7 +27,7 @@ export default function ChatRoom() {
       socket.emit('authenticate', token)
     })
 
-    socket.on('match_found', (roomId: string) => {
+    socket.on('match_found', () => {
       setIsConnected(true)
       setIsSearching(false)
       setMessages([{
@@ -89,13 +89,12 @@ export default function ChatRoom() {
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setInputMessage(e.target.value)
-    
+
     if (typingTimeoutRef.current) {
       clearTimeout(typingTimeoutRef.current)
     }
-    
-    typingTimeoutRef.current = setTimeout(() => {
-    }, 1000)
+
+    typingTimeoutRef.current = setTimeout(() => {}, 1000)
   }
 
   const sendMessage = () => {
@@ -108,7 +107,6 @@ export default function ChatRoom() {
 
   return (
     <div className="h-screen flex flex-col bg-[#efeae2] overflow-hidden">
-      {/* Header */}
       <div className="bg-[#075e54] px-4 py-3 flex justify-between items-center shadow-md">
         <div className="flex items-center space-x-3">
           <div className="relative">
@@ -143,7 +141,6 @@ export default function ChatRoom() {
         </div>
       </div>
 
-      {/* Chat Area with Background */}
       <div className="flex-1 overflow-y-auto relative">
         <div 
           className="absolute inset-0 z-0"
@@ -153,8 +150,7 @@ export default function ChatRoom() {
             opacity: 0.1
           }}
         />
-        
-        {/* Messages */}
+
         <div className="relative z-10 min-h-full p-4">
           <div className="max-w-3xl mx-auto space-y-4">
             {messages.map((message, index) => (
@@ -195,7 +191,6 @@ export default function ChatRoom() {
         </div>
       </div>
 
-      {/* Bottom Action Area */}
       <div className="bg-[#f0f0f0] border-t border-gray-200">
         {!isConnected && !isSearching && (
           <div className="p-4 flex justify-center">
@@ -218,7 +213,6 @@ export default function ChatRoom() {
           </div>
         )}
 
-        {/* Message Input */}
         {isConnected && (
           <div className="p-3">
             <div className="max-w-3xl mx-auto flex items-center space-x-2">
@@ -258,18 +252,16 @@ export default function ChatRoom() {
         .message-left {
           border-radius: 15px 15px 15px 3px;
         }
-        
-        /* Hide scrollbar for Chrome, Safari and Opera */
+
         .overflow-y-auto::-webkit-scrollbar {
           display: none;
         }
-        
-        /* Hide scrollbar for IE, Edge and Firefox */
+
         .overflow-y-auto {
-          -ms-overflow-style: none;  /* IE and Edge */
-          scrollbar-width: none;  /* Firefox */
+          -ms-overflow-style: none;
+          scrollbar-width: none;
         }
       `}</style>
     </div>
   )
-} 
+}
