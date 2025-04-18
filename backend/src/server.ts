@@ -183,9 +183,9 @@ app.get('/', (req, res) => {
   res.send('Welcome to the Chat App!');
 });
 
-// Important: Add a catch-all route to handle client-side routing
-// This must be placed AFTER all other routes
-app.get('*', (req, res) => {
+// FIXED: Changed the catch-all route to use app.use() instead of app.get('*')
+// This avoids issues with path-to-regexp parsing
+app.use((req, res) => {
   // Check if the request seems to be for an API endpoint or a static file
   if (req.path.startsWith('/api/') || req.path.includes('.')) {
     res.status(404).send('Not found');
