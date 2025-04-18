@@ -1,0 +1,7 @@
+services:
+  - type: web
+    name: your-backend
+    env: node
+    buildCommand: "npm install"
+    startCommand: "npm start"
+    nodeVersion: "14" # or your preferred Node.js version
