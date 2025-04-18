@@ -3,7 +3,6 @@
 import { useEffect, useState, useRef } from 'react'
 import { getSocket, initializeSocket } from '@/utils/socket'
 import { auth } from '@/utils/auth'
-import Image from 'next/image'
 import VoiceChat from './VoiceChat'
 
 interface Message {
@@ -18,7 +17,6 @@ export default function ChatRoom() {
   const [inputMessage, setInputMessage] = useState('')
   const [isConnected, setIsConnected] = useState(false)
   const [isSearching, setIsSearching] = useState(false)
-  const [isTyping, setIsTyping] = useState(false)
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null)
 
@@ -96,9 +94,7 @@ export default function ChatRoom() {
       clearTimeout(typingTimeoutRef.current)
     }
     
-    setIsTyping(true)
     typingTimeoutRef.current = setTimeout(() => {
-      setIsTyping(false)
     }, 1000)
   }
 

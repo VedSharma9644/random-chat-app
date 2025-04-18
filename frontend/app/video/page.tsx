@@ -1,14 +1,23 @@
 'use client'
 
 import { useEffect, useState, useRef } from 'react'
+import { Socket } from 'socket.io-client'
 import { getSocket, initializeSocket } from '@/utils/socket'
 import { auth } from '@/utils/auth'
 import { useRouter } from 'next/navigation'
+
+interface Message {
+  id: string
+  text: string
+  sender: string
+  timestamp: Date
+}
 
 export default function VideoChatPage() {
   const router = useRouter()
   const [isConnected, setIsConnected] = useState(false)
   const [isSearching, setIsSearching] = useState(false)
+  const [messages, setMessages] = useState<Message[]>([])
   const [isMuted, setIsMuted] = useState(true)
   const [isVideoOff, setIsVideoOff] = useState(false)
   const [isSpeaking, setIsSpeaking] = useState(false)
@@ -20,6 +29,7 @@ export default function VideoChatPage() {
   const analyserRef = useRef<AnalyserNode | null>(null)
   const localVideoRef = useRef<HTMLVideoElement | null>(null)
   const remoteVideoRef = useRef<HTMLVideoElement | null>(null)
+  const socket = useRef<Socket | null>(null)
 
   const getMediaStream = async (isTestMode = false) => {
     try {
@@ -56,6 +66,53 @@ export default function VideoChatPage() {
         return getMediaStream(true)
       }
       throw error
+    }
+  }
+
+  const startVideoChat = async () => {
+    try {
+      const stream = await getMediaStream()
+      localStreamRef.current = stream
+
+      if (localVideoRef.current) {
+        localVideoRef.current.srcObject = stream
+      }
+
+      const peerConnection = new RTCPeerConnection({
+        iceServers: [
+          { urls: 'stun:stun.l.google.com:19302' },
+          { urls: 'stun:stun1.l.google.com:19302' },
+          { urls: 'stun:stun2.l.google.com:19302' },
+          { urls: 'stun:stun3.l.google.com:19302' },
+          { urls: 'stun:stun4.l.google.com:19302' }
+        ]
+      })
+
+      peerConnectionRef.current = peerConnection
+
+      stream.getTracks().forEach(track => {
+        peerConnection.addTrack(track, stream)
+      })
+
+      peerConnection.ontrack = (event) => {
+        if (remoteVideoRef.current) {
+          remoteVideoRef.current.srcObject = event.streams[0]
+        }
+      }
+
+      peerConnection.onicecandidate = (event) => {
+        if (event.candidate && socket.current) {
+          socket.current.emit('ice_candidate', event.candidate)
+        }
+      }
+
+      const offer = await peerConnection.createOffer()
+      await peerConnection.setLocalDescription(offer)
+      if (socket.current) {
+        socket.current.emit('offer', offer)
+      }
+    } catch (error) {
+      console.error('Error starting video chat:', error)
     }
   }
 
@@ -174,27 +231,15 @@ export default function VideoChatPage() {
       }
     }
 
-    socket.on('match_found', async (roomId: string) => {
+    socket.on('match_found', () => {
       setIsConnected(true)
       setIsSearching(false)
-
-      try {
-        // Get local media stream
-        const stream = await getMediaStream()
-        localStreamRef.current = stream
-        
-        // Add tracks to peer connection
-        stream.getTracks().forEach(track => {
-          peerConnection.addTrack(track, stream)
-        })
-
-        // Display local video
-        if (localVideoRef.current) {
-          localVideoRef.current.srcObject = stream
-        }
-      } catch (error) {
-        console.error('Error setting up local stream:', error)
-      }
+      setMessages([{
+        id: 'system',
+        text: '🎉 Connected with a chat partner! Say hello!',
+        sender: 'system',
+        timestamp: new Date()
+      }])
     })
 
     socket.on('offer', async (offer: RTCSessionDescriptionInit) => {
@@ -300,35 +345,12 @@ export default function VideoChatPage() {
     }
   }, [])
 
-  const startVideoChat = async () => {
-    try {
-      if (!localStreamRef.current) {
-        const stream = await getMediaStream()
-        localStreamRef.current = stream
-        
-        // Display local video
-        if (localVideoRef.current) {
-          localVideoRef.current.srcObject = stream
-        }
-      }
-      
-      const audioContext = new AudioContext()
-      audioContextRef.current = audioContext
-      
-      const analyser = audioContext.createAnalyser()
-      analyserRef.current = analyser
-      
-      const source = audioContext.createMediaStreamSource(localStreamRef.current)
-      source.connect(analyser)
-      
-      checkVoiceActivity()
-      
-      setIsMuted(false)
-      setIsVideoOff(false)
-    } catch (error) {
-      console.error('Error accessing media devices:', error)
+  useEffect(() => {
+    if (isConnected) {
+      getMediaStream()
+      startVideoChat()
     }
-  }
+  }, [isConnected, getMediaStream, startVideoChat])
 
   const stopVideoChat = () => {
     if (localStreamRef.current) {

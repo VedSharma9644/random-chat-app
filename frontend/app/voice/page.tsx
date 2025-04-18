@@ -1,14 +1,23 @@
 'use client'
 
 import { useEffect, useState, useRef } from 'react'
+import { Socket } from 'socket.io-client'
 import { getSocket, initializeSocket } from '@/utils/socket'
 import { auth } from '@/utils/auth'
 import { useRouter } from 'next/navigation'
+
+interface Message {
+  id: string
+  text: string
+  sender: string
+  timestamp: Date
+}
 
 export default function VoiceChatPage() {
   const router = useRouter()
   const [isConnected, setIsConnected] = useState(false)
   const [isSearching, setIsSearching] = useState(false)
+  const [messages, setMessages] = useState<Message[]>([])
   const [isMuted, setIsMuted] = useState(true)
   const [isSpeaking, setIsSpeaking] = useState(false)
   const localStreamRef = useRef<MediaStream | null>(null)
@@ -17,6 +26,50 @@ export default function VoiceChatPage() {
   const audioContextRef = useRef<AudioContext | null>(null)
   const analyserRef = useRef<AnalyserNode | null>(null)
   const remoteAudioRef = useRef<HTMLAudioElement | null>(null)
+  const socket = useRef<Socket | null>(null)
+
+  const startVoiceChat = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
+      localStreamRef.current = stream
+
+      const peerConnection = new RTCPeerConnection({
+        iceServers: [
+          { urls: 'stun:stun.l.google.com:19302' },
+          { urls: 'stun:stun1.l.google.com:19302' },
+          { urls: 'stun:stun2.l.google.com:19302' },
+          { urls: 'stun:stun3.l.google.com:19302' },
+          { urls: 'stun:stun4.l.google.com:19302' }
+        ]
+      })
+
+      peerConnectionRef.current = peerConnection
+
+      stream.getTracks().forEach(track => {
+        peerConnection.addTrack(track, stream)
+      })
+
+      peerConnection.ontrack = (event) => {
+        if (remoteAudioRef.current) {
+          remoteAudioRef.current.srcObject = event.streams[0]
+        }
+      }
+
+      peerConnection.onicecandidate = (event) => {
+        if (event.candidate && socket.current) {
+          socket.current.emit('ice_candidate', event.candidate)
+        }
+      }
+
+      const offer = await peerConnection.createOffer()
+      await peerConnection.setLocalDescription(offer)
+      if (socket.current) {
+        socket.current.emit('offer', offer)
+      }
+    } catch (error) {
+      console.error('Error starting voice chat:', error)
+    }
+  }
 
   useEffect(() => {
     const socket = initializeSocket()
@@ -132,22 +185,15 @@ export default function VoiceChatPage() {
       }
     }
 
-    socket.on('match_found', async (roomId: string) => {
+    socket.on('match_found', () => {
       setIsConnected(true)
       setIsSearching(false)
-
-      try {
-        // Get local audio stream first
-        const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
-        localStreamRef.current = stream
-        
-        // Add audio tracks to peer connection
-        stream.getTracks().forEach(track => {
-          peerConnection.addTrack(track, stream)
-        })
-      } catch (error) {
-        console.error('Error setting up local stream:', error)
-      }
+      setMessages([{
+        id: 'system',
+        text: '🎉 Connected with a chat partner! Say hello!',
+        sender: 'system',
+        timestamp: new Date()
+      }])
     })
 
     socket.on('offer', async (offer: RTCSessionDescriptionInit) => {
@@ -247,29 +293,11 @@ export default function VoiceChatPage() {
     }
   }, [])
 
-  const startVoiceChat = async () => {
-    try {
-      if (!localStreamRef.current) {
-        const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
-        localStreamRef.current = stream
-      }
-      
-      const audioContext = new AudioContext()
-      audioContextRef.current = audioContext
-      
-      const analyser = audioContext.createAnalyser()
-      analyserRef.current = analyser
-      
-      const source = audioContext.createMediaStreamSource(localStreamRef.current)
-      source.connect(analyser)
-      
-      checkVoiceActivity()
-      
-      setIsMuted(false)
-    } catch (error) {
-      console.error('Error accessing microphone:', error)
+  useEffect(() => {
+    if (isConnected) {
+      startVoiceChat()
     }
-  }
+  }, [isConnected, startVoiceChat])
 
   const stopVoiceChat = () => {
     if (localStreamRef.current) {
