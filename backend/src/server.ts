@@ -7,8 +7,8 @@ import dotenv from 'dotenv'
 
 dotenv.config()
 
-// Initialize Firebase Admin
-const serviceAccount = require('../serviceAccountKey.json')
+// Initialize Firebase Admin from environment variable
+const serviceAccount = JSON.parse(process.env.SERVICE_ACCOUNT_KEY || '{}')
 admin.initializeApp({
   credential: admin.credential.cert(serviceAccount)
 })
@@ -150,4 +150,4 @@ io.on('connection', (socket) => {
 const PORT = process.env.PORT || 3001
 httpServer.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`)
-}) 
+})
