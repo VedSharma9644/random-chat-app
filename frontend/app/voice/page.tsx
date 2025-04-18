@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState, useRef } from 'react'
+import { useEffect, useState, useRef, useCallback } from 'react'
 import { Socket } from 'socket.io-client'
 import { getSocket, initializeSocket } from '@/utils/socket'
 import { auth } from '@/utils/auth'
@@ -26,9 +26,10 @@ export default function VoiceChatPage() {
   const audioContextRef = useRef<AudioContext | null>(null)
   const analyserRef = useRef<AnalyserNode | null>(null)
   const remoteAudioRef = useRef<HTMLAudioElement | null>(null)
-  const socket = useRef<Socket | null>(null)
+  const socketRef = useRef<Socket | null>(null)
 
-  const startVoiceChat = async () => {
+  // Use useCallback to prevent re-creation of the function on each render
+  const startVoiceChat = useCallback(async () => {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
       localStreamRef.current = stream
@@ -56,23 +57,76 @@ export default function VoiceChatPage() {
       }
 
       peerConnection.onicecandidate = (event) => {
-        if (event.candidate && socket.current) {
-          socket.current.emit('ice_candidate', event.candidate)
+        if (event.candidate && socketRef.current) {
+          socketRef.current.emit('ice_candidate', event.candidate)
         }
       }
 
+      // Create and setup audio analyzer for voice activity detection
+      const audioContext = new AudioContext()
+      audioContextRef.current = audioContext
+      
+      const analyser = audioContext.createAnalyser()
+      analyserRef.current = analyser
+      analyser.fftSize = 256
+      
+      const source = audioContext.createMediaStreamSource(stream)
+      source.connect(analyser)
+      
+      // Start checking voice activity
+      checkVoiceActivity()
+
       const offer = await peerConnection.createOffer()
       await peerConnection.setLocalDescription(offer)
-      if (socket.current) {
-        socket.current.emit('offer', offer)
+      if (socketRef.current) {
+        socketRef.current.emit('offer', offer)
       }
+      
+      setIsMuted(false)
     } catch (error) {
       console.error('Error starting voice chat:', error)
     }
-  }
+  }, []);
+
+  // Use useCallback for checkVoiceActivity as well
+  const checkVoiceActivity = useCallback(() => {
+    if (!analyserRef.current) return
+
+    const analyser = analyserRef.current
+    const dataArray = new Uint8Array(analyser.frequencyBinCount)
+    
+    const check = () => {
+      analyser.getByteFrequencyData(dataArray)
+      const average = dataArray.reduce((a, b) => a + b) / dataArray.length
+      setIsSpeaking(average > 20)
+      requestAnimationFrame(check)
+    }
+    
+    check()
+  }, []);
+
+  // Use useCallback for stopVoiceChat as well
+  const stopVoiceChat = useCallback(() => {
+    if (localStreamRef.current) {
+      localStreamRef.current.getTracks().forEach(track => track.stop())
+      localStreamRef.current = null
+    }
+    if (audioContextRef.current) {
+      audioContextRef.current.close().catch(err => console.error("Error closing audio context:", err))
+      audioContextRef.current = null
+    }
+    if (peerConnectionRef.current) {
+      peerConnectionRef.current.close()
+      peerConnectionRef.current = null
+    }
+    setIsMuted(true)
+    setIsSpeaking(false)
+  }, []);
 
   useEffect(() => {
     const socket = initializeSocket()
+    socketRef.current = socket
+    
     let reconnectAttempts = 0
     const MAX_RECONNECT_ATTEMPTS = 3
     let isNegotiating = false
@@ -103,8 +157,6 @@ export default function VoiceChatPage() {
       if (peerConnection.connectionState === 'connected') {
         setIsConnected(true)
         reconnectAttempts = 0
-        // Start voice chat when connected
-        startVoiceChat()
       } else if (peerConnection.connectionState === 'disconnected' || 
                  peerConnection.connectionState === 'failed') {
         setIsConnected(false)
@@ -291,46 +343,13 @@ export default function VoiceChatPage() {
       socket.off('partner_disconnected')
       stopVoiceChat()
     }
-  }, [])
+  }, [stopVoiceChat]);
 
   useEffect(() => {
     if (isConnected) {
       startVoiceChat()
     }
-  }, [isConnected, startVoiceChat])
-
-  const stopVoiceChat = () => {
-    if (localStreamRef.current) {
-      localStreamRef.current.getTracks().forEach(track => track.stop())
-      localStreamRef.current = null
-    }
-    if (audioContextRef.current) {
-      audioContextRef.current.close()
-      audioContextRef.current = null
-    }
-    if (peerConnectionRef.current) {
-      peerConnectionRef.current.close()
-      peerConnectionRef.current = null
-    }
-    setIsMuted(true)
-    setIsSpeaking(false)
-  }
-
-  const checkVoiceActivity = () => {
-    if (!analyserRef.current) return
-
-    const analyser = analyserRef.current
-    const dataArray = new Uint8Array(analyser.frequencyBinCount)
-    
-    const check = () => {
-      analyser.getByteFrequencyData(dataArray)
-      const average = dataArray.reduce((a, b) => a + b) / dataArray.length
-      setIsSpeaking(average > 20)
-      requestAnimationFrame(check)
-    }
-    
-    check()
-  }
+  }, [isConnected, startVoiceChat]);
 
   const toggleMute = () => {
     if (isMuted) {
@@ -345,6 +364,21 @@ export default function VoiceChatPage() {
     setIsSearching(true)
     socket.emit('find_match')
   }
+
+  // Chat UI rendering - only include messages if they're used in the UI
+  const renderMessages = () => {
+    if (messages.length === 0) return null;
+    
+    return (
+      <div className="p-4">
+        {messages.map((msg) => (
+          <div key={msg.id} className={`mb-2 ${msg.sender === 'system' ? 'text-center text-gray-500' : ''}`}>
+            {msg.text}
+          </div>
+        ))}
+      </div>
+    );
+  };
 
   return (
     <div className="h-screen flex flex-col bg-[#efeae2] overflow-hidden">
@@ -452,12 +486,13 @@ export default function VoiceChatPage() {
             </button>
           </div>
         )}
+        
+        {/* Display messages if any */}
+        {renderMessages()}
       </div>
 
-      {/* Hidden audio element for remote stream */}
-      <audio ref={remoteAudioRef} autoPlay playsInline />
+      {/* Hidden audio element for remote stream (only need one) */}
       <audio ref={remoteAudioRef} autoPlay playsInline className="hidden" />
-
     </div>
   )
-} 
+}
