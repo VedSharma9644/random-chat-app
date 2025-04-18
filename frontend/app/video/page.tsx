@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState, useRef } from 'react'
+import { useEffect, useState, useRef, useCallback } from 'react'
 import { Socket } from 'socket.io-client'
 import { getSocket, initializeSocket } from '@/utils/socket'
 import { auth } from '@/utils/auth'
@@ -17,7 +17,7 @@ export default function VideoChatPage() {
   const router = useRouter()
   const [isConnected, setIsConnected] = useState(false)
   const [isSearching, setIsSearching] = useState(false)
-  const [messages, setMessages] = useState<Message[]>([])
+  // Remove or use the messages state
   const [isMuted, setIsMuted] = useState(true)
   const [isVideoOff, setIsVideoOff] = useState(false)
   const [isSpeaking, setIsSpeaking] = useState(false)
@@ -31,7 +31,7 @@ export default function VideoChatPage() {
   const remoteVideoRef = useRef<HTMLVideoElement | null>(null)
   const socket = useRef<Socket | null>(null)
 
-  const getMediaStream = async (isTestMode = false) => {
+  const getMediaStream = useCallback(async (isTestMode = false) => {
     try {
       if (isTestMode) {
         // Create a test video stream with a static image
@@ -67,9 +67,9 @@ export default function VideoChatPage() {
       }
       throw error
     }
-  }
+  }, [])
 
-  const startVideoChat = async () => {
+  const startVideoChat = useCallback(async () => {
     try {
       const stream = await getMediaStream()
       localStreamRef.current = stream
@@ -114,7 +114,7 @@ export default function VideoChatPage() {
     } catch (error) {
       console.error('Error starting video chat:', error)
     }
-  }
+  }, [getMediaStream])
 
   useEffect(() => {
     const socket = initializeSocket()
@@ -234,12 +234,6 @@ export default function VideoChatPage() {
     socket.on('match_found', () => {
       setIsConnected(true)
       setIsSearching(false)
-      setMessages([{
-        id: 'system',
-        text: '🎉 Connected with a chat partner! Say hello!',
-        sender: 'system',
-        timestamp: new Date()
-      }])
     })
 
     socket.on('offer', async (offer: RTCSessionDescriptionInit) => {
@@ -343,7 +337,7 @@ export default function VideoChatPage() {
       socket.off('partner_disconnected')
       stopVideoChat()
     }
-  }, [])
+  }, [getMediaStream, startVideoChat])
 
   useEffect(() => {
     if (isConnected) {
@@ -370,6 +364,9 @@ export default function VideoChatPage() {
     setIsSpeaking(false)
   }
 
+  // Either remove this function or use it somewhere
+  // Since it's not used, we can comment it out for now
+  /*
   const checkVoiceActivity = () => {
     if (!analyserRef.current) return
 
@@ -385,6 +382,7 @@ export default function VideoChatPage() {
     
     check()
   }
+  */
 
   const toggleMute = () => {
     if (localStreamRef.current) {
@@ -586,4 +584,4 @@ export default function VideoChatPage() {
       </div>
     </div>
   )
-} 
+}
