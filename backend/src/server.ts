@@ -19,7 +19,6 @@ const app = express();
 // Define allowed origin
 const allowedOrigin = process.env.CLIENT_URL || 'http://localhost:3000';
 
-
 // Configure CORS options
 const corsOptions = {
   origin: allowedOrigin,
@@ -174,6 +173,25 @@ httpServer.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
 });
 
+// Define your API routes first
+app.get('/api/status', (req, res) => {
+  res.json({ status: 'online' });
+});
+
+// Root route
 app.get('/', (req, res) => {
   res.send('Welcome to the Chat App!');
+});
+
+// Important: Add a catch-all route to handle client-side routing
+// This must be placed AFTER all other routes
+app.get('*', (req, res) => {
+  // Check if the request seems to be for an API endpoint or a static file
+  if (req.path.startsWith('/api/') || req.path.includes('.')) {
+    res.status(404).send('Not found');
+  } else {
+    // For all other requests, serve the index.html file
+    // This allows client-side routing to work properly
+    res.sendFile(path.join(__dirname, '../frontend/index.html'));
+  }
 });
