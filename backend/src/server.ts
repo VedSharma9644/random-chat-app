@@ -156,3 +156,7 @@ httpServer.listen(PORT, () => {
 app.get('/', (req, res) => {
   res.send('Welcome to the Chat App!');
 });
+import path from 'path';
+
+// Serve static files from the 'frontend' directory
+app.use(express.static(path.join(__dirname, '../frontend')));
