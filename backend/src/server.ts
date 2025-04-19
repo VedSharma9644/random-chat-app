@@ -91,27 +91,27 @@ io.on('connection', (socket) => {
     }
   });
 
-  // Handle user looking for a match
-  // Handle user initiating matchmaking by clicking "Start Search"
-socket.on('start_search', () => {
-  if (waitingUsers.includes(socket.id)) return; // prevent duplicate adds
+    // Handle user initiating matchmaking by clicking "Start Search"
+    socket.on('start_search', () => {
+      if (waitingUsers.includes(socket.id)) return; // Avoid duplicates
 
-  if (waitingUsers.length > 0) {
-    const partnerId = waitingUsers.pop()!;
-    const roomId = `${socket.id}-${partnerId}`;
+      if (waitingUsers.length > 0) {
+        const partnerId = waitingUsers.pop()!;
+        const roomId = `${socket.id}-${partnerId}`;
 
-    rooms.set(roomId, new Set([socket.id, partnerId]));
+        rooms.set(roomId, new Set([socket.id, partnerId]));
 
-    socket.join(roomId);
-    const partnerSocket = io.sockets.sockets.get(partnerId);
-    partnerSocket?.join(roomId);
+        socket.join(roomId);
+        const partnerSocket = io.sockets.sockets.get(partnerId);
+        partnerSocket?.join(roomId);
 
-    // Notify both users that a match has been found
-    io.to(roomId).emit('match_found', roomId);
-  } else {
-    waitingUsers.push(socket.id);
-  }
-});
+        // Notify both users that a match has been found
+        io.to(roomId).emit('match_found', roomId);
+      } else {
+        waitingUsers.push(socket.id);
+      }
+    });
+
 
 
   // Handle WebRTC signaling
