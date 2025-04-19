@@ -1,0 +1,215 @@
+"use strict";
+var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    var desc = Object.getOwnPropertyDescriptor(m, k);
+    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
+      desc = { enumerable: true, get: function() { return m[k]; } };
+    }
+    Object.defineProperty(o, k2, desc);
+}) : (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    o[k2] = m[k];
+}));
+var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
+    Object.defineProperty(o, "default", { enumerable: true, value: v });
+}) : function(o, v) {
+    o["default"] = v;
+});
+var __importStar = (this && this.__importStar) || (function () {
+    var ownKeys = function(o) {
+        ownKeys = Object.getOwnPropertyNames || function (o) {
+            var ar = [];
+            for (var k in o) if (Object.prototype.hasOwnProperty.call(o, k)) ar[ar.length] = k;
+            return ar;
+        };
+        return ownKeys(o);
+    };
+    return function (mod) {
+        if (mod && mod.__esModule) return mod;
+        var result = {};
+        if (mod != null) for (var k = ownKeys(mod), i = 0; i < k.length; i++) if (k[i] !== "default") __createBinding(result, mod, k[i]);
+        __setModuleDefault(result, mod);
+        return result;
+    };
+})();
+var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
+    function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
+    return new (P || (P = Promise))(function (resolve, reject) {
+        function fulfilled(value) { try { step(generator.next(value)); } catch (e) { reject(e); } }
+        function rejected(value) { try { step(generator["throw"](value)); } catch (e) { reject(e); } }
+        function step(result) { result.done ? resolve(result.value) : adopt(result.value).then(fulfilled, rejected); }
+        step((generator = generator.apply(thisArg, _arguments || [])).next());
+    });
+};
+var __importDefault = (this && this.__importDefault) || function (mod) {
+    return (mod && mod.__esModule) ? mod : { "default": mod };
+};
+Object.defineProperty(exports, "__esModule", { value: true });
+const express_1 = __importDefault(require("express"));
+const http_1 = require("http");
+const socket_io_1 = require("socket.io");
+const cors_1 = __importDefault(require("cors"));
+const admin = __importStar(require("firebase-admin"));
+const dotenv_1 = __importDefault(require("dotenv"));
+const path_1 = __importDefault(require("path"));
+dotenv_1.default.config();
+// Initialize Firebase Admin from environment variable
+const serviceAccount = JSON.parse(process.env.SERVICE_ACCOUNT_KEY || '{}');
+admin.initializeApp({
+    credential: admin.credential.cert(serviceAccount),
+});
+const app = (0, express_1.default)();
+// Define allowed origin
+const allowedOrigin = process.env.CLIENT_URL || 'http://localhost:3000';
+// Configure CORS options
+const corsOptions = {
+    origin: allowedOrigin,
+    methods: ['GET', 'POST'],
+    credentials: true,
+};
+// Apply CORS middleware
+app.use((0, cors_1.default)(corsOptions));
+// Handle preflight requests
+app.options('*', (0, cors_1.default)(corsOptions));
+app.use(express_1.default.json());
+// Serve static files from the 'frontend' directory
+app.use(express_1.default.static(path_1.default.join(__dirname, '../frontend')));
+const httpServer = (0, http_1.createServer)(app);
+const io = new socket_io_1.Server(httpServer, {
+    cors: {
+        origin: allowedOrigin,
+        methods: ['GET', 'POST'],
+        credentials: true,
+    },
+});
+// Store waiting users and active rooms
+const waitingUsers = [];
+const activeRooms = {};
+// Store active rooms and their participants
+const rooms = new Map();
+// Helper function to find a partner in a room
+function findPartner(socketId) {
+    for (const [roomId, participants] of rooms.entries()) {
+        if (participants.has(socketId)) {
+            for (const participantId of participants) {
+                if (participantId !== socketId) {
+                    return { id: participantId };
+                }
+            }
+        }
+    }
+    return null;
+}
+// Socket.io connection handling
+io.on('connection', (socket) => {
+    console.log('User connected:', socket.id);
+    // Handle user authentication
+    socket.on('authenticate', (token) => __awaiter(void 0, void 0, void 0, function* () {
+        try {
+            const decodedToken = yield admin.auth().verifyIdToken(token);
+            socket.data.userId = decodedToken.uid;
+            console.log('User authenticated:', decodedToken.uid);
+        }
+        catch (error) {
+            console.error('Authentication error:', error);
+            socket.disconnect();
+        }
+    }));
+    // Handle user looking for a match
+    socket.on('find_match', () => {
+        if (waitingUsers.length > 0) {
+            const partnerId = waitingUsers.pop();
+            const roomId = `${socket.id}-${partnerId}`;
+            // Create room with both users
+            rooms.set(roomId, new Set([socket.id, partnerId]));
+            // Join both users to the room
+            socket.join(roomId);
+            const partnerSocket = io.sockets.sockets.get(partnerId);
+            partnerSocket === null || partnerSocket === void 0 ? void 0 : partnerSocket.join(roomId);
+            // Notify both users
+            io.to(roomId).emit('match_found', roomId);
+        }
+        else {
+            waitingUsers.push(socket.id);
+        }
+    });
+    // Handle WebRTC signaling
+    socket.on('offer', (offer) => {
+        const partner = findPartner(socket.id);
+        if (partner) {
+            socket.to(partner.id).emit('offer', offer);
+        }
+    });
+    socket.on('answer', (answer) => {
+        const partner = findPartner(socket.id);
+        if (partner) {
+            socket.to(partner.id).emit('answer', answer);
+        }
+    });
+    socket.on('ice_candidate', (candidate) => {
+        const partner = findPartner(socket.id);
+        if (partner) {
+            socket.to(partner.id).emit('ice_candidate', candidate);
+        }
+    });
+    // Handle messages
+    socket.on('message', (message) => {
+        const roomId = Object.keys(activeRooms).find((room) => activeRooms[room].includes(socket.id));
+        if (roomId) {
+            io.to(roomId).emit('message', {
+                id: Date.now().toString(),
+                text: message,
+                sender: socket.id,
+                timestamp: new Date(),
+            });
+        }
+    });
+    // Handle disconnection
+    socket.on('disconnect', () => {
+        console.log('User disconnected:', socket.id);
+        // Remove from waiting list
+        const waitingIndex = waitingUsers.indexOf(socket.id);
+        if (waitingIndex !== -1) {
+            waitingUsers.splice(waitingIndex, 1);
+        }
+        // Clean up rooms
+        for (const [roomId, participants] of rooms.entries()) {
+            if (participants.has(socket.id)) {
+                participants.delete(socket.id);
+                if (participants.size === 0) {
+                    rooms.delete(roomId);
+                }
+                else {
+                    // Notify remaining participant
+                    const remainingParticipant = Array.from(participants)[0];
+                    io.to(remainingParticipant).emit('partner_disconnected');
+                }
+            }
+        }
+    });
+});
+const PORT = process.env.PORT || 3001;
+httpServer.listen(PORT, () => {
+    console.log(`Server running on port ${PORT}`);
+});
+// Define your API routes first
+app.get('/api/status', (req, res) => {
+    res.json({ status: 'online' });
+});
+// Root route
+app.get('/', (req, res) => {
+    res.send('Welcome to the Chat App!');
+});
+// FIXED: Changed the catch-all route to use app.use() instead of app.get('*')
+// This avoids issues with path-to-regexp parsing
+app.use((req, res) => {
+    // Check if the request seems to be for an API endpoint or a static file
+    if (req.path.startsWith('/api/') || req.path.includes('.')) {
+        res.status(404).send('Not found');
+    }
+    else {
+        // For all other requests, serve the index.html file
+        // This allows client-side routing to work properly
+        res.sendFile(path_1.default.join(__dirname, '../frontend/index.html'));
+    }
+});
