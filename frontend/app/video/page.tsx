@@ -18,7 +18,7 @@ const Page = () => {
   }
 
   useEffect(() => {
-    const newSocket = io('http://localhost:3001')
+    const newSocket = io('https://random-chat-app-idz3.onrender.com/')
     setSocket(newSocket)
 
     newSocket.on('offer', async (offer: RTCSessionDescriptionInit) => {
