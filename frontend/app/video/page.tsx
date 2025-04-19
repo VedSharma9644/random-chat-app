@@ -6,6 +6,10 @@ import { io, Socket } from 'socket.io-client'
 const Page = () => {
   const [socket, setSocket] = useState<Socket | null>(null)
   const [isMatched, setIsMatched] = useState(false)
+  const [isSearching, setIsSearching] = useState(false)
+  const [isMuted, setIsMuted] = useState(false)
+  const [stream, setStream] = useState<MediaStream | null>(null)
+
   const localVideoRef = useRef<HTMLVideoElement>(null)
   const remoteVideoRef = useRef<HTMLVideoElement>(null)
   const peerConnection = useRef<RTCPeerConnection | null>(null)
@@ -19,23 +23,15 @@ const Page = () => {
   }
 
   useEffect(() => {
-    const newSocket = io('https://random-chat-app-idz3.onrender.com', {
-      transports: ['websocket'],
-      withCredentials: true,
-    })
+    const newSocket = io('https://random-chat-app-idz3.onrender.com/')
     setSocket(newSocket)
 
-    // Request a random match
-    newSocket.emit('find_match')
-
-    // On successful match
-    newSocket.on('match_found', () => {
+    newSocket.on('matched', () => {
       console.log('✅ Matched with a peer!')
       setIsMatched(true)
     })
 
     newSocket.on('offer', async (offer: RTCSessionDescriptionInit) => {
-      console.log('📩 Received offer')
       if (!peerConnection.current) createPeerConnection()
 
       await peerConnection.current?.setRemoteDescription(new RTCSessionDescription(offer))
@@ -46,27 +42,20 @@ const Page = () => {
     })
 
     newSocket.on('answer', async (answer: RTCSessionDescriptionInit) => {
-      console.log('📩 Received answer')
       await peerConnection.current?.setRemoteDescription(new RTCSessionDescription(answer))
     })
 
-    newSocket.on('ice_candidate', async (candidate: RTCIceCandidateInit) => {
-      console.log('📩 Received ICE candidate')
+    newSocket.on('candidate', async (candidate: RTCIceCandidateInit) => {
       try {
         await peerConnection.current?.addIceCandidate(new RTCIceCandidate(candidate))
       } catch (e) {
-        console.error('Error adding received ICE candidate', e)
+        console.error('Error adding received ice candidate', e)
       }
     })
 
     newSocket.on('partner_disconnected', () => {
-      alert('🚫 Your partner disconnected.')
-      setIsMatched(false)
-      peerConnection.current?.close()
-      peerConnection.current = null
-      if (remoteVideoRef.current) {
-        remoteVideoRef.current.srcObject = null
-      }
+      alert('The other user disconnected.')
+      endCall()
     })
 
     return () => {
@@ -79,7 +68,7 @@ const Page = () => {
 
     peerConnection.current.onicecandidate = (event) => {
       if (event.candidate && socket) {
-        socket.emit('ice_candidate', event.candidate)
+        socket.emit('candidate', event.candidate)
       }
     }
 
@@ -90,23 +79,57 @@ const Page = () => {
     }
   }
 
+  const startSearch = () => {
+    if (socket) {
+      setIsSearching(true)
+      socket.emit('find_match')
+    }
+  }
+
   const startCall = async () => {
-    const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true })
+    const userStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true })
+    setStream(userStream)
 
     if (localVideoRef.current) {
-      localVideoRef.current.srcObject = stream
+      localVideoRef.current.srcObject = userStream
     }
 
     createPeerConnection()
 
-    stream.getTracks().forEach((track) => {
-      peerConnection.current?.addTrack(track, stream)
+    userStream.getTracks().forEach((track) => {
+      peerConnection.current?.addTrack(track, userStream)
     })
 
     const offer = await peerConnection.current?.createOffer()
     await peerConnection.current?.setLocalDescription(offer)
 
     socket?.emit('offer', offer)
+  }
+
+  const toggleMute = () => {
+    if (stream) {
+      stream.getAudioTracks().forEach((track) => {
+        track.enabled = !track.enabled
+      })
+      setIsMuted((prev) => !prev)
+    }
+  }
+
+  const endCall = () => {
+    peerConnection.current?.close()
+    peerConnection.current = null
+    setIsMatched(false)
+    setIsSearching(false)
+    setIsMuted(false)
+
+    if (localVideoRef.current) {
+      localVideoRef.current.srcObject = null
+    }
+    if (remoteVideoRef.current) {
+      remoteVideoRef.current.srcObject = null
+    }
+    stream?.getTracks().forEach((track) => track.stop())
+    setStream(null)
   }
 
   return (
@@ -118,15 +141,40 @@ const Page = () => {
         <video ref={remoteVideoRef} autoPlay playsInline className="w-full md:w-1/2 rounded border" />
       </div>
 
-      {isMatched ? (
+      {!isMatched && !isSearching && (
         <button
-          onClick={startCall}
-          className="mt-4 px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700"
+          onClick={startSearch}
+          className="mt-4 px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
         >
-          Start Call
+          Start Search
         </button>
-      ) : (
-        <p className="text-gray-600">Waiting for another user to join...</p>
+      )}
+
+      {isSearching && !isMatched && (
+        <p className="text-gray-600">Searching for a partner...</p>
+      )}
+
+      {isMatched && (
+        <div className="space-x-2 mt-4">
+          <button
+            onClick={startCall}
+            className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700"
+          >
+            Start Call
+          </button>
+          <button
+            onClick={toggleMute}
+            className="px-4 py-2 bg-yellow-500 text-white rounded hover:bg-yellow-600"
+          >
+            {isMuted ? 'Unmute' : 'Mute'}
+          </button>
+          <button
+            onClick={endCall}
+            className="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700"
+          >
+            Disconnect
+          </button>
+        </div>
       )}
     </div>
   )
