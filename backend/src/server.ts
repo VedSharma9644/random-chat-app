@@ -20,7 +20,6 @@ if (!serviceAccount || !serviceAccount.project_id) {
 // Initialize Firebase Admin SDK
 admin.initializeApp({
   credential: admin.credential.cert(serviceAccount),
-  databaseURL: 'https://<your-database-name>.firebaseio.com',
 });
 
 console.log('Firebase Admin Initialized');
