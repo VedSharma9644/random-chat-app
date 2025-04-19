@@ -34,7 +34,8 @@ app.options('*', cors(corsOptions));
 
 app.use(express.json());
 
-// Serve static files from the 'frontend' directory
+// Serve static files from the 'frontend' directory if you need to serve built assets
+// For example, if you build your frontend using 'next export' or a similar approach
 app.use(express.static(path.join(__dirname, '../frontend')));
 
 const httpServer = createServer(app);
@@ -183,15 +184,11 @@ app.get('/', (req, res) => {
   res.send('Welcome to the Chat App!');
 });
 
-// FIXED: Changed the catch-all route to use app.use() instead of app.get('*')
-// This avoids issues with path-to-regexp parsing
-app.use((req, res) => {
-  // Check if the request seems to be for an API endpoint or a static file
-  if (req.path.startsWith('/api/') || req.path.includes('.')) {
-    res.status(404).send('Not found');
-  } else {
-    // For all other requests, serve the index.html file
-    // This allows client-side routing to work properly
-    res.sendFile(path.join(__dirname, '../frontend/index.html'));
-  }
-});
+// Remove this block since it's unnecessary for a Next.js frontend
+// app.use((req, res) => {
+//   if (req.path.startsWith('/api/') || req.path.includes('.')) {
+//     res.status(404).send('Not found');
+//   } else {
+//     res.sendFile(path.join(__dirname, '../frontend/index.html'));
+//   }
+// });
