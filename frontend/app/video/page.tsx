@@ -8,17 +8,15 @@ const Page = () => {
   const [isMatched, setIsMatched] = useState(false)
   const [isSearching, setIsSearching] = useState(false)
   const [isMuted, setIsMuted] = useState(false)
-  const [stream, setStream] = useState<MediaStream | null>(null)
 
   const localVideoRef = useRef<HTMLVideoElement>(null)
   const remoteVideoRef = useRef<HTMLVideoElement>(null)
   const peerConnection = useRef<RTCPeerConnection | null>(null)
+  const localStream = useRef<MediaStream | null>(null)
 
   const servers = {
     iceServers: [
-      {
-        urls: 'stun:stun.l.google.com:19302',
-      },
+      { urls: 'stun:stun.l.google.com:19302' },
     ],
   }
 
@@ -29,6 +27,7 @@ const Page = () => {
     newSocket.on('matched', () => {
       console.log('✅ Matched with a peer!')
       setIsMatched(true)
+      setIsSearching(false)
     })
 
     newSocket.on('offer', async (offer: RTCSessionDescriptionInit) => {
@@ -49,13 +48,13 @@ const Page = () => {
       try {
         await peerConnection.current?.addIceCandidate(new RTCIceCandidate(candidate))
       } catch (e) {
-        console.error('Error adding received ice candidate', e)
+        console.error('Error adding ICE candidate', e)
       }
     })
 
     newSocket.on('partner_disconnected', () => {
-      alert('The other user disconnected.')
-      endCall()
+      alert('Partner disconnected')
+      resetCall()
     })
 
     return () => {
@@ -81,23 +80,22 @@ const Page = () => {
 
   const startSearch = () => {
     if (socket) {
-      setIsSearching(true)
       socket.emit('find_match')
+      setIsSearching(true)
     }
   }
 
   const startCall = async () => {
-    const userStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true })
-    setStream(userStream)
+    localStream.current = await navigator.mediaDevices.getUserMedia({ video: true, audio: true })
 
     if (localVideoRef.current) {
-      localVideoRef.current.srcObject = userStream
+      localVideoRef.current.srcObject = localStream.current
     }
 
     createPeerConnection()
 
-    userStream.getTracks().forEach((track) => {
-      peerConnection.current?.addTrack(track, userStream)
+    localStream.current.getTracks().forEach((track) => {
+      peerConnection.current?.addTrack(track, localStream.current!)
     })
 
     const offer = await peerConnection.current?.createOffer()
@@ -107,29 +105,32 @@ const Page = () => {
   }
 
   const toggleMute = () => {
-    if (stream) {
-      stream.getAudioTracks().forEach((track) => {
+    if (localStream.current) {
+      localStream.current.getAudioTracks().forEach((track) => {
         track.enabled = !track.enabled
       })
-      setIsMuted((prev) => !prev)
+      setIsMuted(!isMuted)
     }
   }
 
-  const endCall = () => {
+  const resetCall = () => {
     peerConnection.current?.close()
     peerConnection.current = null
     setIsMatched(false)
     setIsSearching(false)
-    setIsMuted(false)
+
+    if (localStream.current) {
+      localStream.current.getTracks().forEach((track) => track.stop())
+      localStream.current = null
+    }
 
     if (localVideoRef.current) {
       localVideoRef.current.srcObject = null
     }
+
     if (remoteVideoRef.current) {
       remoteVideoRef.current.srcObject = null
     }
-    stream?.getTracks().forEach((track) => track.stop())
-    setStream(null)
   }
 
   return (
@@ -150,26 +151,26 @@ const Page = () => {
         </button>
       )}
 
-      {isSearching && !isMatched && (
-        <p className="text-gray-600">Searching for a partner...</p>
-      )}
+      {isSearching && !isMatched && <p className="text-gray-600">🔍 Searching for a partner...</p>}
 
       {isMatched && (
-        <div className="space-x-2 mt-4">
+        <div className="space-x-4 mt-4">
           <button
             onClick={startCall}
             className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700"
           >
             Start Call
           </button>
+
           <button
             onClick={toggleMute}
             className="px-4 py-2 bg-yellow-500 text-white rounded hover:bg-yellow-600"
           >
             {isMuted ? 'Unmute' : 'Mute'}
           </button>
+
           <button
-            onClick={endCall}
+            onClick={resetCall}
             className="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700"
           >
             Disconnect

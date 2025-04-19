@@ -92,25 +92,27 @@ io.on('connection', (socket) => {
   });
 
   // Handle user looking for a match
-  socket.on('find_match', () => {
-    if (waitingUsers.length > 0) {
-      const partnerId = waitingUsers.pop()!;
-      const roomId = `${socket.id}-${partnerId}`;
+  // Handle user initiating matchmaking by clicking "Start Search"
+socket.on('start_search', () => {
+  if (waitingUsers.includes(socket.id)) return; // prevent duplicate adds
 
-      // Create room with both users
-      rooms.set(roomId, new Set([socket.id, partnerId]));
+  if (waitingUsers.length > 0) {
+    const partnerId = waitingUsers.pop()!;
+    const roomId = `${socket.id}-${partnerId}`;
 
-      // Join both users to the room
-      socket.join(roomId);
-      const partnerSocket = io.sockets.sockets.get(partnerId);
-      partnerSocket?.join(roomId);
+    rooms.set(roomId, new Set([socket.id, partnerId]));
 
-      // Notify both users
-      io.to(roomId).emit('match_found', roomId);
-    } else {
-      waitingUsers.push(socket.id);
-    }
-  });
+    socket.join(roomId);
+    const partnerSocket = io.sockets.sockets.get(partnerId);
+    partnerSocket?.join(roomId);
+
+    // Notify both users that a match has been found
+    io.to(roomId).emit('match_found', roomId);
+  } else {
+    waitingUsers.push(socket.id);
+  }
+});
+
 
   // Handle WebRTC signaling
   socket.on('offer', (offer: RTCSessionDescriptionInit) => {
