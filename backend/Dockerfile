@@ -1,0 +1,30 @@
+FROM node:18-alpine
+
+WORKDIR /app
+
+# Install all dependencies including devDependencies for building
+COPY package*.json ./
+RUN npm ci
+
+# Copy source code
+COPY . .
+
+# Build TypeScript
+RUN npm run build
+
+# Remove devDependencies and keep only production dependencies
+RUN npm ci --only=production
+
+# Set environment variables
+ENV NODE_ENV=production
+ENV PORT=8080
+
+# Add health check with increased timeout and retries
+HEALTHCHECK --interval=30s --timeout=30s --start-period=10s --retries=5 \
+  CMD wget --no-verbose --tries=1 --spider http://localhost:${PORT}/api/status || exit 1
+
+# Expose the port
+EXPOSE 8080
+
+# Start the server with proper error handling
+CMD ["sh", "-c", "node dist/server.js || exit 1"]

@@ -1,0 +1,60 @@
+steps:
+  # Build and push frontend
+  - name: 'gcr.io/cloud-builders/docker'
+    args: ['build', '-t', 'gcr.io/random-chat-app-2/random-chat-frontend', './frontend']
+  - name: 'gcr.io/cloud-builders/docker'
+    args: ['push', 'gcr.io/random-chat-app-2/random-chat-frontend']
+
+  # Build and push backend
+  - name: 'gcr.io/cloud-builders/docker'
+    args: ['build', '-t', 'gcr.io/random-chat-app-2/random-chat-backend', './backend']
+  - name: 'gcr.io/cloud-builders/docker'
+    args: ['push', 'gcr.io/random-chat-app-2/random-chat-backend']
+
+  # Deploy frontend to Cloud Run
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    entrypoint: gcloud
+    args:
+      - 'run'
+      - 'deploy'
+      - 'random-chat-frontend'
+      - '--image'
+      - 'gcr.io/random-chat-app-2/random-chat-frontend'
+      - '--region'
+      - 'us-central1'
+      - '--platform'
+      - 'managed'
+      - '--allow-unauthenticated'
+      - '--min-instances'
+      - '1'
+      - '--max-instances'
+      - '10'
+      - '--set-env-vars'
+      - 'NEXT_PUBLIC_API_URL=https://random-chat-backend-random-chat-app-2.a.run.app,NEXT_PUBLIC_WS_URL=wss://random-chat-backend-random-chat-app-2.a.run.app'
+
+  # Deploy backend to Cloud Run
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    entrypoint: gcloud
+    args:
+      - 'run'
+      - 'deploy'
+      - 'random-chat-backend'
+      - '--image'
+      - 'gcr.io/random-chat-app-2/random-chat-backend'
+      - '--region'
+      - 'us-central1'
+      - '--platform'
+      - 'managed'
+      - '--allow-unauthenticated'
+      - '--min-instances'
+      - '1'
+      - '--max-instances'
+      - '10'
+      - '--timeout'
+      - '300'
+      - '--set-env-vars'
+      - 'NODE_ENV=production,CORS_ORIGIN=https://random-chat-frontend-random-chat-app-2.a.run.app'
+
+images:
+  - 'gcr.io/random-chat-app-2/random-chat-frontend'
+  - 'gcr.io/random-chat-app-2/random-chat-backend' 
