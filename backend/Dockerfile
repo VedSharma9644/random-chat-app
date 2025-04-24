@@ -20,7 +20,7 @@ ENV NODE_ENV=production
 ENV PORT=8080
 
 # Add health check with increased timeout and retries
-HEALTHCHECK --interval=30s --timeout=30s --start-period=10s --retries=5 \
+HEALTHCHECK --interval=10s --timeout=5s --start-period=30s --retries=3 \
   CMD wget --no-verbose --tries=1 --spider http://localhost:${PORT}/api/status || exit 1
 
 # Expose the port

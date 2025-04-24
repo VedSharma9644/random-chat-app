@@ -25,6 +25,14 @@ console.log('Firebase Admin Initialized');
 const dev = process.env.NODE_ENV !== 'production';
 const app = express();
 
+// Add health check endpoint before other middleware
+app.get('/api/status', (req, res) => {
+  res.status(200).json({ 
+    status: 'online',
+    timestamp: new Date().toISOString()
+  });
+});
+
 // Define allowed origin
 const allowedOrigin = process.env.CORS_ORIGIN || 'http://localhost:3000';
 
