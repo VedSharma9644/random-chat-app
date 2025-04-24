@@ -61,7 +61,6 @@ app.use(cors(corsOptions));
 // Handle preflight requests
 app.options(/(.*)/, cors(corsOptions));
 
-
 app.use(express.json());
 
 // Initialize Socket.IO
@@ -71,7 +70,12 @@ const io = new Server(httpServer, {
     origin: allowedOrigin,
     methods: ['GET', 'POST'],
     credentials: true,
+    allowedHeaders: ['Content-Type', 'Authorization'],
   },
+  transports: ['websocket', 'polling'],
+  allowEIO3: true,
+  pingTimeout: 60000,
+  pingInterval: 25000,
 });
 
 // Store waiting users and active rooms

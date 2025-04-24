@@ -54,17 +54,39 @@ const dotenv_1 = __importDefault(require("dotenv"));
 dotenv_1.default.config();
 // Initialize Firebase Admin from environment variable
 // Access the Firebase service account JSON from the environment variable
-const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT_KEY || '{}');
+let serviceAccount;
+try {
+    serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT_KEY || '{}');
+    console.log('Firebase service account loaded successfully');
+}
+catch (error) {
+    console.error('Error parsing Firebase service account:', error);
+    throw new Error('Invalid Firebase service account credentials');
+}
 if (!serviceAccount || !serviceAccount.project_id) {
+    console.error('Missing or invalid Firebase service account credentials');
     throw new Error('Missing Firebase service account credentials');
 }
 // Initialize Firebase Admin SDK
-admin.initializeApp({
-    credential: admin.credential.cert(serviceAccount),
-});
-console.log('Firebase Admin Initialized');
+try {
+    admin.initializeApp({
+        credential: admin.credential.cert(serviceAccount),
+    });
+    console.log('Firebase Admin Initialized successfully');
+}
+catch (error) {
+    console.error('Error initializing Firebase Admin:', error);
+    throw error;
+}
 const dev = process.env.NODE_ENV !== 'production';
 const app = (0, express_1.default)();
+// Add health check endpoint before other middleware
+app.get('/api/status', (req, res) => {
+    res.status(200).json({
+        status: 'online',
+        timestamp: new Date().toISOString()
+    });
+});
 // Define allowed origin
 const allowedOrigin = process.env.CORS_ORIGIN || 'http://localhost:3000';
 // Configure CORS options
@@ -85,7 +107,12 @@ const io = new socket_io_1.Server(httpServer, {
         origin: allowedOrigin,
         methods: ['GET', 'POST'],
         credentials: true,
+        allowedHeaders: ['Content-Type', 'Authorization'],
     },
+    transports: ['websocket', 'polling'],
+    allowEIO3: true,
+    pingTimeout: 60000,
+    pingInterval: 25000,
 });
 // Store waiting users and active rooms
 const waitingUsers = [];
@@ -202,25 +229,7 @@ app.get('/api/status', (req, res) => {
     res.json({ status: 'online' });
 });
 // Start the server
-const PORT = process.env.PORT || '8080';
-const HOST = '0.0.0.0';
-console.log('Environment variables:');
-console.log('NODE_ENV:', process.env.NODE_ENV);
-console.log('PORT:', PORT);
-console.log('CORS_ORIGIN:', process.env.CORS_ORIGIN);
-console.log('Firebase initialized:', !!admin.apps.length);
-console.log(`Starting server on ${HOST}:${PORT}`);
-try {
-    httpServer.listen(parseInt(PORT, 10), HOST, () => {
-        console.log(`Server running on ${HOST}:${PORT}`);
-    });
-    // Handle server errors
-    httpServer.on('error', (error) => {
-        console.error('Server error:', error);
-        process.exit(1);
-    });
-}
-catch (error) {
-    console.error('Failed to start server:', error);
-    process.exit(1);
-}
+const PORT = process.env.PORT || 8080;
+httpServer.listen(PORT, () => {
+    console.log(`Server is running on port ${PORT}`);
+});
