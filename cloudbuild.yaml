@@ -54,6 +54,8 @@ steps:
       - '300'
       - '--set-env-vars'
       - 'NODE_ENV=production,CORS_ORIGIN=https://random-chat-frontend-random-chat-app-2.a.run.app'
+      - '--set-secrets'
+      - 'FIREBASE_SERVICE_ACCOUNT_KEY=firebase-service-account:latest'
 
 images:
   - 'gcr.io/random-chat-app-2/random-chat-frontend'

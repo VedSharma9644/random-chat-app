@@ -9,18 +9,30 @@ dotenv.config();
 
 // Initialize Firebase Admin from environment variable
 // Access the Firebase service account JSON from the environment variable
-const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT_KEY || '{}');
+let serviceAccount;
+try {
+  serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT_KEY || '{}');
+  console.log('Firebase service account loaded successfully');
+} catch (error) {
+  console.error('Error parsing Firebase service account:', error);
+  throw new Error('Invalid Firebase service account credentials');
+}
 
 if (!serviceAccount || !serviceAccount.project_id) {
+  console.error('Missing or invalid Firebase service account credentials');
   throw new Error('Missing Firebase service account credentials');
 }
 
 // Initialize Firebase Admin SDK
-admin.initializeApp({
-  credential: admin.credential.cert(serviceAccount),
-});
-
-console.log('Firebase Admin Initialized');
+try {
+  admin.initializeApp({
+    credential: admin.credential.cert(serviceAccount),
+  });
+  console.log('Firebase Admin Initialized successfully');
+} catch (error) {
+  console.error('Error initializing Firebase Admin:', error);
+  throw error;
+}
 
 const dev = process.env.NODE_ENV !== 'production';
 const app = express();
