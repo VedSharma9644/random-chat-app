@@ -42,3 +42,4 @@ next-env.d.ts
 # Add this to .gitignore
 backend/serviceAccountKey.json
 node_modules/
+serviceAccountKey.json

@@ -204,7 +204,23 @@ app.get('/api/status', (req, res) => {
 // Start the server
 const PORT = process.env.PORT || '8080';
 const HOST = '0.0.0.0';
+console.log('Environment variables:');
+console.log('NODE_ENV:', process.env.NODE_ENV);
+console.log('PORT:', PORT);
+console.log('CORS_ORIGIN:', process.env.CORS_ORIGIN);
+console.log('Firebase initialized:', !!admin.apps.length);
 console.log(`Starting server on ${HOST}:${PORT}`);
-httpServer.listen(parseInt(PORT, 10), HOST, () => {
-    console.log(`Server running on ${HOST}:${PORT}`);
-});
+try {
+    httpServer.listen(parseInt(PORT, 10), HOST, () => {
+        console.log(`Server running on ${HOST}:${PORT}`);
+    });
+    // Handle server errors
+    httpServer.on('error', (error) => {
+        console.error('Server error:', error);
+        process.exit(1);
+    });
+}
+catch (error) {
+    console.error('Failed to start server:', error);
+    process.exit(1);
+}
