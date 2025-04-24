@@ -26,5 +26,5 @@ HEALTHCHECK --interval=30s --timeout=30s --start-period=10s --retries=5 \
 # Expose the port
 EXPOSE 8080
 
-# Start the server with proper error handling
-CMD ["sh", "-c", "node dist/server.js || exit 1"]
+# Start the server with proper error handling and logging
+CMD ["sh", "-c", "node dist/server.js 2>&1 | tee -a /proc/1/fd/1 || exit 1"]
