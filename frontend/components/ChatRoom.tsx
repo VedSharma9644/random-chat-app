@@ -2,7 +2,8 @@
 'use client';
 
 import { useEffect, useState, useRef } from 'react';
-import { initializeSocket, getSocket } from '@/utils/socket';
+import { Socket } from 'socket.io-client';
+import { initializeSocket } from '@/utils/socket';
 import { UserIcon, ArrowPathIcon } from '@heroicons/react/24/outline';
 
 interface Message {
@@ -19,69 +20,79 @@ export default function ChatRoom() {
   const [partnerId, setPartnerId] = useState<string | null>(null);
   const [searching, setSearching] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
-  const socketRef = useRef<ReturnType<typeof initializeSocket> | null>(null);
+  const socketRef = useRef<Socket | null>(null);
 
   useEffect(() => {
-    // Initialize socket only once
-    if (!socketRef.current) {
-      socketRef.current = initializeSocket();
-    }
+    let mounted = true;
 
-    const socket = socketRef.current;
+    const initSocket = async () => {
+      try {
+        const socket = await initializeSocket();
+        if (!mounted) return;
+        
+        socketRef.current = socket;
 
-    socket.on('match_found', (partnerId: string) => {
-      console.log('Match found with partner:', partnerId);
-      if (!partnerId) {
-        console.error('Invalid partner ID received');
-        return;
+        socket.on('match_found', (partnerId: string) => {
+          console.log('Match found with partner:', partnerId);
+          if (!partnerId) {
+            console.error('Invalid partner ID received');
+            return;
+          }
+          setPartnerId(partnerId);
+          setConnected(true);
+          setSearching(false);
+          setMessages((prev) => [
+            ...prev,
+            {
+              id: Date.now().toString(),
+              text: '🎉 Connected with a chat partner! Say hello!',
+              sender: 'system',
+              timestamp: new Date().toISOString(),
+            },
+          ]);
+        });
+
+        socket.on('message', (data: { id: string; text: { text: string; to: string }; sender: string; timestamp: string }) => {
+          console.log('Received message:', data);
+          if (!data.text || !data.sender) return;
+          
+          const message: Message = {
+            id: data.id,
+            text: typeof data.text === 'string' ? data.text : data.text.text,
+            sender: data.sender === socket.id ? 'me' : 'partner',
+            timestamp: data.timestamp,
+          };
+          setMessages((prev) => [...prev, message]);
+        });
+
+        socket.on('partner_disconnected', () => {
+          setMessages((prev) => [
+            ...prev,
+            {
+              id: Date.now().toString(),
+              text: '❌ Your chat partner disconnected.',
+              sender: 'system',
+              timestamp: new Date().toISOString(),
+            },
+          ]);
+          setConnected(false);
+          setPartnerId(null);
+          setSearching(false);
+        });
+      } catch (error) {
+        console.error('Failed to initialize socket:', error);
       }
-      setPartnerId(partnerId);
-      setConnected(true);
-      setSearching(false);
-      setMessages((prev) => [
-        ...prev,
-        {
-          id: Date.now().toString(),
-          text: '🎉 Connected with a chat partner! Say hello!',
-          sender: 'system',
-          timestamp: new Date().toISOString(),
-        },
-      ]);
-    });
+    };
 
-    socket.on('message', (data: { id: string; text: { text: string; to: string }; sender: string; timestamp: string }) => {
-      console.log('Received message:', data);
-      if (!data.text || !data.sender) return;
-      
-      const message: Message = {
-        id: data.id,
-        text: typeof data.text === 'string' ? data.text : data.text.text,
-        sender: data.sender === socket.id ? 'me' : 'partner',
-        timestamp: data.timestamp,
-      };
-      setMessages((prev) => [...prev, message]);
-    });
-
-    socket.on('partner_disconnected', () => {
-      setMessages((prev) => [
-        ...prev,
-        {
-          id: Date.now().toString(),
-          text: '❌ Your chat partner disconnected.',
-          sender: 'system',
-          timestamp: new Date().toISOString(),
-        },
-      ]);
-      setConnected(false);
-      setPartnerId(null);
-      setSearching(false);
-    });
+    initSocket();
 
     return () => {
-      // Don't disconnect here, let the socket utility handle it
-      socket.off('match_found');
-      socket.off('message');
-      socket.off('partner_disconnected');
+      mounted = false;
+      if (socketRef.current) {
+        socketRef.current.off('match_found');
+        socketRef.current.off('message');
+        socketRef.current.off('partner_disconnected');
+      }
     };
   }, []);
 
@@ -89,38 +100,55 @@ export default function ChatRoom() {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
-  const startSearch = () => {
-    const socket = getSocket();
-    socket.emit('find_match');
-    setSearching(true);
-    setMessages((prev) => [
-      ...prev,
-      {
-        id: Date.now().toString(),
-        text: '🔍 Searching for a partner...',
-        sender: 'system',
-        timestamp: new Date().toISOString(),
-      },
-    ]);
+  const startSearch = async () => {
+    try {
+      const socket = await initializeSocket();
+      socket.emit('find_match');
+      setSearching(true);
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: Date.now().toString(),
+          text: '🔍 Searching for a partner...',
+          sender: 'system',
+          timestamp: new Date().toISOString(),
+        },
+      ]);
+    } catch (error) {
+      console.error('Failed to start search:', error);
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: Date.now().toString(),
+          text: '❌ Failed to connect to chat server.',
+          sender: 'system',
+          timestamp: new Date().toISOString(),
+        },
+      ]);
+    }
   };
 
-  const sendMessage = () => {
+  const sendMessage = async () => {
     console.log('Attempting to send message:', { input, partnerId });
     if (!input.trim() || !partnerId) {
       console.log('Cannot send message:', { hasInput: !!input.trim(), hasPartnerId: !!partnerId });
       return;
     }
 
-    const socket = getSocket();
-    const messageData = {
-      id: Date.now().toString(),
-      text: input,
-      sender: socket.id,
-      timestamp: new Date().toISOString(),
-    };
-    console.log('Emitting message event with data:', messageData);
-    socket.emit('message', messageData);
-    setInput('');
+    try {
+      const socket = await initializeSocket();
+      const messageData = {
+        id: Date.now().toString(),
+        text: input,
+        sender: socket.id,
+        timestamp: new Date().toISOString(),
+      };
+      console.log('Emitting message event with data:', messageData);
+      socket.emit('message', messageData);
+      setInput('');
+    } catch (error) {
+      console.error('Failed to send message:', error);
+    }
   };
 
   return (

@@ -2,17 +2,27 @@ import { io, Socket } from 'socket.io-client';
 import { auth } from './auth';
 
 let socket: Socket | null = null;
+let socketPromise: Promise<Socket> | null = null;
 
-export const initializeSocket = () => {
-  if (!socket) {
+export const initializeSocket = async () => {
+  if (socketPromise) return socketPromise;
+  if (socket) return socket;
+
+  socketPromise = (async () => {
     const wsUrl = process.env.NEXT_PUBLIC_WS_URL || 'http://localhost:3001';
     console.log('Connecting to WebSocket server:', wsUrl);
 
+    // Get token asynchronously before creating socket
+    let token;
+    try {
+      token = await auth.currentUser?.getIdToken(true);
+    } catch (err) {
+      console.error('Error getting auth token:', err);
+    }
+
     socket = io(wsUrl, {
-      auth: {
-        token: auth.currentUser?.getIdToken(),
-      },
-      transports: ['websocket'],
+      auth: token ? { token } : undefined,
+      transports: ['websocket', 'polling'], // Try both, fallback to polling
       reconnection: true,
       reconnectionAttempts: 5,
       reconnectionDelay: 1000,
@@ -20,6 +30,7 @@ export const initializeSocket = () => {
       timeout: 20000,
       forceNew: true,
       autoConnect: true,
+      path: '/socket.io/',
     });
 
     socket.on('connect', () => {
@@ -49,8 +60,11 @@ export const initializeSocket = () => {
         }, 5000);
       }
     });
-  }
-  return socket;
+
+    return socket;
+  })();
+
+  return socketPromise;
 };
 
 export const getSocket = () => {
@@ -65,4 +79,5 @@ export const disconnectSocket = () => {
     socket.disconnect();
     socket = null;
   }
+  socketPromise = null;
 };

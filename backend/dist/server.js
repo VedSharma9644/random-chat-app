@@ -52,74 +52,55 @@ const cors_1 = __importDefault(require("cors"));
 const admin = __importStar(require("firebase-admin"));
 const dotenv_1 = __importDefault(require("dotenv"));
 dotenv_1.default.config();
-// Initialize Firebase Admin from environment variable
-// Access the Firebase service account JSON from the environment variable
+// Firebase Admin initialization
 let serviceAccount;
 try {
     serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT_KEY || '{}');
-    console.log('Firebase service account loaded successfully');
-}
-catch (error) {
-    console.error('Error parsing Firebase service account:', error);
-    throw new Error('Invalid Firebase service account credentials');
-}
-if (!serviceAccount || !serviceAccount.project_id) {
-    console.error('Missing or invalid Firebase service account credentials');
-    throw new Error('Missing Firebase service account credentials');
-}
-// Initialize Firebase Admin SDK
-try {
+    if (!serviceAccount.project_id) {
+        throw new Error('Missing or invalid Firebase service account credentials');
+    }
     admin.initializeApp({
         credential: admin.credential.cert(serviceAccount),
     });
-    console.log('Firebase Admin Initialized successfully');
+    console.log('✅ Firebase Admin Initialized');
 }
 catch (error) {
-    console.error('Error initializing Firebase Admin:', error);
-    throw error;
+    console.error('❌ Firebase initialization failed:', error);
+    process.exit(1);
 }
-const dev = process.env.NODE_ENV !== 'production';
 const app = (0, express_1.default)();
-// Add health check endpoint before other middleware
+// ✅ Use cors middleware
+app.use((0, cors_1.default)({
+    origin: 'https://random-chat-frontend-202138484562.us-central1.run.app',
+    methods: ['GET', 'POST', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization'],
+    credentials: true,
+}));
+app.use(express_1.default.json());
+// ✅ Health check endpoint
 app.get('/api/status', (req, res) => {
     res.status(200).json({
         status: 'online',
-        timestamp: new Date().toISOString()
+        timestamp: new Date().toISOString(),
+        port: process.env.PORT || 8080,
     });
 });
-// Define allowed origin
-const allowedOrigin = process.env.CORS_ORIGIN || 'http://localhost:3000';
-// Configure CORS options
-const corsOptions = {
-    origin: allowedOrigin,
-    methods: ['GET', 'POST'],
-    credentials: true,
-};
-// Apply CORS middleware
-app.use((0, cors_1.default)(corsOptions));
-// Handle preflight requests
-app.options(/(.*)/, (0, cors_1.default)(corsOptions));
-app.use(express_1.default.json());
-// Initialize Socket.IO
 const httpServer = (0, http_1.createServer)(app);
 const io = new socket_io_1.Server(httpServer, {
     cors: {
-        origin: allowedOrigin,
-        methods: ['GET', 'POST'],
-        credentials: true,
+        origin: 'https://random-chat-frontend-202138484562.us-central1.run.app',
+        methods: ['GET', 'POST', 'OPTIONS'],
         allowedHeaders: ['Content-Type', 'Authorization'],
+        credentials: true,
     },
     transports: ['websocket', 'polling'],
     allowEIO3: true,
     pingTimeout: 60000,
     pingInterval: 25000,
+    path: '/socket.io/',
 });
-// Store waiting users and active rooms
 const waitingUsers = [];
-const activeRooms = {};
-// Store active rooms and their participants
 const rooms = new Map();
-// Helper function to find a partner in a room
 function findPartner(socketId) {
     for (const [roomId, participants] of rooms.entries()) {
         if (participants.has(socketId)) {
@@ -132,64 +113,55 @@ function findPartner(socketId) {
     }
     return null;
 }
-// Socket.io connection handling
 io.on('connection', (socket) => {
-    console.log('User connected:', socket.id);
-    // Handle user authentication
+    console.log('🔌 User connected:', socket.id);
     socket.on('authenticate', (token) => __awaiter(void 0, void 0, void 0, function* () {
         try {
             const decodedToken = yield admin.auth().verifyIdToken(token);
             socket.data.userId = decodedToken.uid;
-            console.log('User authenticated:', decodedToken.uid);
+            console.log('🔐 Authenticated user:', decodedToken.uid);
         }
         catch (error) {
-            console.error('Authentication error:', error);
+            console.error('❌ Auth failed:', error);
             socket.disconnect();
         }
     }));
-    // Handle user looking for a match
     socket.on('find_match', () => {
-        if (waitingUsers.length > 0) {
+        let attempts = 0;
+        const maxAttempts = 10;
+        while (waitingUsers.length > 0 && attempts < maxAttempts) {
+            attempts++;
             const partnerId = waitingUsers.pop();
-            const roomId = `${socket.id}-${partnerId}`;
-            // Create room with both users
-            rooms.set(roomId, new Set([socket.id, partnerId]));
-            // Join both users to the room
-            socket.join(roomId);
             const partnerSocket = io.sockets.sockets.get(partnerId);
-            partnerSocket === null || partnerSocket === void 0 ? void 0 : partnerSocket.join(roomId);
-            // Notify both users
-            io.to(roomId).emit('match_found', roomId);
+            if (partnerSocket) {
+                const roomId = `${socket.id}-${partnerId}`;
+                rooms.set(roomId, new Set([socket.id, partnerId]));
+                socket.join(roomId);
+                partnerSocket.join(roomId);
+                io.to(roomId).emit('match_found', roomId);
+                return;
+            }
         }
-        else {
-            waitingUsers.push(socket.id);
-        }
+        waitingUsers.push(socket.id);
     });
-    // Handle WebRTC signaling
     socket.on('offer', (offer) => {
         const partner = findPartner(socket.id);
-        if (partner) {
+        if (partner)
             socket.to(partner.id).emit('offer', offer);
-        }
     });
     socket.on('answer', (answer) => {
         const partner = findPartner(socket.id);
-        if (partner) {
+        if (partner)
             socket.to(partner.id).emit('answer', answer);
-        }
     });
     socket.on('ice_candidate', (candidate) => {
         const partner = findPartner(socket.id);
-        if (partner) {
+        if (partner)
             socket.to(partner.id).emit('ice_candidate', candidate);
-        }
     });
-    // Handle messages
     socket.on('message', (message) => {
-        // Find the room that contains this socket
         for (const [roomId, participants] of rooms.entries()) {
             if (participants.has(socket.id)) {
-                // Emit the message to all participants in the room
                 io.to(roomId).emit('message', {
                     id: Date.now().toString(),
                     text: message,
@@ -200,15 +172,12 @@ io.on('connection', (socket) => {
             }
         }
     });
-    // Handle disconnection
     socket.on('disconnect', () => {
-        console.log('User disconnected:', socket.id);
-        // Remove from waiting list
+        console.log('❌ User disconnected:', socket.id);
         const waitingIndex = waitingUsers.indexOf(socket.id);
         if (waitingIndex !== -1) {
             waitingUsers.splice(waitingIndex, 1);
         }
-        // Clean up rooms
         for (const [roomId, participants] of rooms.entries()) {
             if (participants.has(socket.id)) {
                 participants.delete(socket.id);
@@ -216,20 +185,18 @@ io.on('connection', (socket) => {
                     rooms.delete(roomId);
                 }
                 else {
-                    // Notify remaining participant
-                    const remainingParticipant = Array.from(participants)[0];
-                    io.to(remainingParticipant).emit('partner_disconnected');
+                    const remaining = Array.from(participants)[0];
+                    io.to(remaining).emit('partner_disconnected');
                 }
             }
         }
     });
 });
-// API route example
-app.get('/api/status', (req, res) => {
-    res.json({ status: 'online' });
-});
-// Start the server
 const PORT = process.env.PORT || 8080;
 httpServer.listen(PORT, () => {
-    console.log(`Server is running on port ${PORT}`);
+    console.log(`🚀 Server running on port ${PORT}`);
+    console.log(`✅ Health check: http://localhost:${PORT}/api/status`);
+}).on('error', (error) => {
+    console.error('❌ Failed to start server:', error);
+    process.exit(1);
 });
