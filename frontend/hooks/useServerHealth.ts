@@ -8,7 +8,12 @@ export const useServerHealth = () => {
 
   const checkHealth = async () => {
     try {
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/status`);
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/status`, {
+        credentials: 'include',
+        headers: {
+          'Content-Type': 'application/json',
+        }
+      });
       if (response.ok) {
         const data = await response.json();
         console.log('Server status:', data);

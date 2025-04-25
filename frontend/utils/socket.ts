@@ -31,6 +31,10 @@ export const initializeSocket = async () => {
       forceNew: true,
       autoConnect: true,
       path: '/socket.io/',
+      withCredentials: true,
+      extraHeaders: {
+        'Access-Control-Allow-Credentials': 'true'
+      }
     });
 
     socket.on('connect', () => {
