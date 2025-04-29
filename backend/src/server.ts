@@ -34,10 +34,19 @@ app.use(cors({
   credentials: true,
 }));
 
+// Handle preflight requests
+app.options('*', cors());
+
 app.use(express.json());
 
-// ✅ Health check endpoint
+// ✅ Health check endpoint with logging
 app.get('/api/status', (req, res) => {
+  console.log('🔍 Health check request received:', {
+    timestamp: new Date().toISOString(),
+    headers: req.headers,
+    origin: req.headers.origin
+  });
+  
   res.status(200).json({
     status: 'online',
     timestamp: new Date().toISOString(),
@@ -91,11 +100,25 @@ io.on('connection', (socket) => {
   });
 
   socket.on('find_match', () => {
-    let attempts = 0;
-    const maxAttempts = 10;
+    console.log('🔍 User looking for match:', socket.id);
+    console.log('👥 Current waiting users:', waitingUsers);
 
-    while (waitingUsers.length > 0 && attempts < maxAttempts) {
-      attempts++;
+    // Check if user is already in a room
+    for (const [roomId, participants] of rooms.entries()) {
+      if (participants.has(socket.id)) {
+        console.log('❌ User already in a room:', socket.id);
+        return;
+      }
+    }
+
+    // Check if user is already waiting
+    if (waitingUsers.includes(socket.id)) {
+      console.log('❌ User already waiting:', socket.id);
+      return;
+    }
+
+    // Check if there's already a waiting user
+    if (waitingUsers.length > 0) {
       const partnerId = waitingUsers.pop()!;
       const partnerSocket = io.sockets.sockets.get(partnerId);
 
@@ -106,12 +129,25 @@ io.on('connection', (socket) => {
         socket.join(roomId);
         partnerSocket.join(roomId);
 
-        io.to(roomId).emit('match_found', roomId);
+        // Randomly decide who is the initiator
+        const isInitiator = Math.random() < 0.5;
+        
+        // Emit match_found to both users with their respective roles
+        socket.emit('match_found', { roomId, initiator: isInitiator });
+        partnerSocket.emit('match_found', { roomId, initiator: !isInitiator });
+        
+        console.log('✅ Match found:', {
+          roomId,
+          user1: { id: socket.id, initiator: isInitiator },
+          user2: { id: partnerId, initiator: !isInitiator }
+        });
         return;
       }
     }
 
+    // If no match found, add to waiting list
     waitingUsers.push(socket.id);
+    console.log('⏳ Added to waiting list:', socket.id);
   });
 
   socket.on('offer', (offer) => {

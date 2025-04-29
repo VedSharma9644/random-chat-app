@@ -181,7 +181,7 @@ const Page = () => {
         newSocket.disconnect();
       };
     }
-  }, [connectSocket, createPeerConnection, startCall, serverStatus])
+  }, [connectSocket, createPeerConnection, startCall, serverStatus, isInitiator])
 
   const startLocalStream = async () => {
     localStream.current = await navigator.mediaDevices.getUserMedia({ video: true, audio: true })

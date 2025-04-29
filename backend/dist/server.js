@@ -76,9 +76,16 @@ app.use((0, cors_1.default)({
     allowedHeaders: ['Content-Type', 'Authorization'],
     credentials: true,
 }));
+// Handle preflight requests
+app.options('*', (0, cors_1.default)());
 app.use(express_1.default.json());
-// ✅ Health check endpoint
+// ✅ Health check endpoint with logging
 app.get('/api/status', (req, res) => {
+    console.log('🔍 Health check request received:', {
+        timestamp: new Date().toISOString(),
+        headers: req.headers,
+        origin: req.headers.origin
+    });
     res.status(200).json({
         status: 'online',
         timestamp: new Date().toISOString(),

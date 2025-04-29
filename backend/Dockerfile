@@ -18,6 +18,7 @@ RUN npm ci --only=production
 # Set environment variables
 ENV NODE_ENV=production
 ENV PORT=8080
+ENV CORS_ORIGIN=https://random-chat-frontend-202138484562.us-central1.run.app
 
 # Add health check with increased timeout and retries
 HEALTHCHECK --interval=10s --timeout=5s --start-period=30s --retries=3 \

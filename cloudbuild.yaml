@@ -30,7 +30,7 @@ steps:
       - '--max-instances'
       - '10'
       - '--set-env-vars'
-      - 'NEXT_PUBLIC_API_URL=https://random-chat-backend-random-chat-app-2.a.run.app,NEXT_PUBLIC_WS_URL=wss://random-chat-backend-random-chat-app-2.a.run.app'
+      - 'NEXT_PUBLIC_API_URL=https://random-chat-backend-202138484562.us-central1.run.app,NEXT_PUBLIC_WS_URL=wss://random-chat-backend-202138484562.us-central1.run.app'
 
   # Deploy backend to Cloud Run
   - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
@@ -53,7 +53,7 @@ steps:
       - '--timeout'
       - '300'
       - '--set-env-vars'
-      - 'NODE_ENV=production,CORS_ORIGIN=https://random-chat-frontend-random-chat-app-2.a.run.app'
+      - 'NODE_ENV=production,CORS_ORIGIN=https://random-chat-frontend-202138484562.us-central1.run.app'
       - '--set-secrets'
       - 'FIREBASE_SERVICE_ACCOUNT_KEY=firebase-service-account:latest'
 
