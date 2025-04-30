@@ -1,5 +1,3 @@
-import { useRef } from 'react';
-
 interface VideoControlsProps {
   isConnected: boolean;
   isMuted: boolean;
