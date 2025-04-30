@@ -134,10 +134,22 @@ io.on('connection', (socket) => {
         }
     }));
     socket.on('find_match', () => {
-        let attempts = 0;
-        const maxAttempts = 10;
-        while (waitingUsers.length > 0 && attempts < maxAttempts) {
-            attempts++;
+        console.log('🔍 User looking for match:', socket.id);
+        console.log('👥 Current waiting users:', waitingUsers);
+        // Check if user is already in a room
+        for (const [roomId, participants] of rooms.entries()) {
+            if (participants.has(socket.id)) {
+                console.log('❌ User already in a room:', socket.id);
+                return;
+            }
+        }
+        // Check if user is already waiting
+        if (waitingUsers.includes(socket.id)) {
+            console.log('❌ User already waiting:', socket.id);
+            return;
+        }
+        // Check if there's already a waiting user
+        if (waitingUsers.length > 0) {
             const partnerId = waitingUsers.pop();
             const partnerSocket = io.sockets.sockets.get(partnerId);
             if (partnerSocket) {
@@ -145,11 +157,22 @@ io.on('connection', (socket) => {
                 rooms.set(roomId, new Set([socket.id, partnerId]));
                 socket.join(roomId);
                 partnerSocket.join(roomId);
-                io.to(roomId).emit('match_found', roomId);
+                // Randomly decide who is the initiator
+                const isInitiator = Math.random() < 0.5;
+                // Emit match_found to both users with their respective roles
+                socket.emit('match_found', { roomId, initiator: isInitiator });
+                partnerSocket.emit('match_found', { roomId, initiator: !isInitiator });
+                console.log('✅ Match found:', {
+                    roomId,
+                    user1: { id: socket.id, initiator: isInitiator },
+                    user2: { id: partnerId, initiator: !isInitiator }
+                });
                 return;
             }
         }
+        // If no match found, add to waiting list
         waitingUsers.push(socket.id);
+        console.log('⏳ Added to waiting list:', socket.id);
     });
     socket.on('offer', (offer) => {
         const partner = findPartner(socket.id);
