@@ -25,17 +25,64 @@ export const createAnalyser = (audioContext: AudioContext) => {
 
 export const setupLocalStream = async () => {
   try {
-    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    console.log('[WebRTC] Requesting user media with audio');
+    const stream = await navigator.mediaDevices.getUserMedia({
+      audio: {
+        echoCancellation: true,
+        noiseSuppression: true,
+        autoGainControl: true
+      }
+    });
+    
+    // Ensure tracks are enabled
+    stream.getAudioTracks().forEach(track => {
+      track.enabled = true;
+      console.log('[WebRTC] Audio track created:', {
+        id: track.id,
+        enabled: track.enabled,
+        muted: track.muted,
+        readyState: track.readyState
+      });
+    });
+    
     return stream;
   } catch (error) {
-    console.error('Error accessing microphone:', error);
+    console.error('[WebRTC] Error accessing microphone:', error);
     throw error;
   }
 };
 
 export const addLocalTracks = (peerConnection: RTCPeerConnection, stream: MediaStream) => {
-  stream.getTracks().forEach(track => {
-    peerConnection.addTrack(track, stream);
+  console.log('[WebRTC] Adding local tracks to peer connection');
+  const audioTracks = stream.getAudioTracks();
+  
+  audioTracks.forEach(track => {
+    // Ensure track is enabled before adding
+    track.enabled = true;
+    
+    console.log('[WebRTC] Adding track to peer connection:', {
+      id: track.id,
+      kind: track.kind,
+      enabled: track.enabled,
+      muted: track.muted
+    });
+    
+    const sender = peerConnection.addTrack(track, stream);
+    console.log('[WebRTC] Track added with sender:', sender.track?.id);
+  });
+  
+  // Log all senders after adding tracks
+  const senders = peerConnection.getSenders();
+  console.log('[WebRTC] Total senders after adding tracks:', senders.length);
+  senders.forEach(sender => {
+    if (sender.track) {
+      console.log('[WebRTC] Sender track details:', {
+        id: sender.track.id,
+        kind: sender.track.kind,
+        enabled: sender.track.enabled,
+        muted: sender.track.muted
+      });
+    }
   });
 };
 
